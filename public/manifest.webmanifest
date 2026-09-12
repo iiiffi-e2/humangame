@@ -1,0 +1,16 @@
+{
+  "name": "HUMAN",
+  "short_name": "HUMAN",
+  "description": "Five tests. One official run. Everyone gets the same five.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F4F0E8",
+  "theme_color": "#111111",
+  "categories": ["games", "social"],
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
