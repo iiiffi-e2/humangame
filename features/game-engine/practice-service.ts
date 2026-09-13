@@ -2,7 +2,6 @@ import 'server-only';
 import { getGame } from '@/features/game-engine/registry';
 import { RunError } from '@/features/game-engine/run-service';
 import type { DailyEvent, DailyManifest, Pillar } from '@/features/game-engine/types';
-import { checkTiming } from '@/lib/anti-cheat';
 import { issuePracticeToken, readPracticeToken } from '@/lib/anti-cheat/tokens';
 import { publicEvent } from '@/lib/daily/manifest';
 import { ensureManifest, todayKey } from '@/lib/daily/service';
@@ -116,14 +115,6 @@ export async function submitPracticeEvent(
         400,
       );
     }
-    // Official submit records timing and only flags at finish. Practice writes
-    // nothing ranked, so a fast field (the same playOneEvent path) must still
-    // advance to the interstitial instead of aborting the replay.
-    void checkTiming(event, {
-      index: event.index,
-      result: validated,
-      durationMs: input.durationMs,
-    });
   }
 
   const crowd = await crowdContext(manifest.id, event);
