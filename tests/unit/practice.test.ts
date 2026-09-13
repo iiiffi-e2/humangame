@@ -175,3 +175,9 @@ describe('practice replay', () => {
     ).rejects.toMatchObject({ code: 'OUT_OF_ORDER', status: 409 });
   });
 });
+
+describe('removed scout route', () => {
+  it('does not ship /api/practice/score', async () => {
+    await expect(import('../../app/api/practice/score/route')).rejects.toThrow();
+  });
+});
