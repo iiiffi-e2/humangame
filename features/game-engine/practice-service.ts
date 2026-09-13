@@ -116,12 +116,14 @@ export async function submitPracticeEvent(
         400,
       );
     }
-    const timing = checkTiming(event, {
+    // Official submit records timing and only flags at finish. Practice writes
+    // nothing ranked, so a fast field (the same playOneEvent path) must still
+    // advance to the interstitial instead of aborting the replay.
+    void checkTiming(event, {
       index: event.index,
       result: validated,
       durationMs: input.durationMs,
     });
-    if (timing) throw new RunError(timing, 'BAD_EVENT', 400);
   }
 
   const crowd = await crowdContext(manifest.id, event);

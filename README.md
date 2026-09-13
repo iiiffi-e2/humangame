@@ -48,7 +48,7 @@ fastest way to see the recipient side of the share loop.
 The first page view mints a guest identity, so you can play immediately with
 no account. One official run per day is enforced; to play again while
 developing, run `npm run db:reset && npm run seed`, or use `/practice`, which
-unlocks after the official run and never writes to a leaderboard.
+unlocks after the official run, replays today's five, and never writes to a leaderboard.
 
 ---
 
