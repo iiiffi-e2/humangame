@@ -97,3 +97,47 @@ export function readGuestToken(token: string, secret: string): GuestTokenPayload
 export function shortToken(bytes = 6): string {
   return randomUUID().replace(/-/g, '').slice(0, bytes * 2).slice(0, 10);
 }
+
+export interface PracticeTokenPayload {
+  jti: string;
+  playerId: string;
+  manifestId: string;
+  mode: 'practice';
+  nextIndex: number;
+  points: number[];
+  iat: number;
+  exp: number;
+}
+
+export function issuePracticeToken(
+  input: Omit<PracticeTokenPayload, 'jti' | 'iat' | 'exp'>,
+  secret: string,
+  now: number = Date.now(),
+): { token: string; payload: PracticeTokenPayload } {
+  const payload: PracticeTokenPayload = {
+    ...input,
+    mode: 'practice',
+    jti: randomUUID(),
+    iat: now,
+    exp: now + RUN_TOKEN_TTL_MS,
+  };
+  return { token: signToken(payload, secret), payload };
+}
+
+export function readPracticeToken(
+  token: string,
+  secret: string,
+  now: number = Date.now(),
+): PracticeTokenPayload | null {
+  const payload = verifyToken<PracticeTokenPayload>(token, secret);
+  if (!payload) return null;
+  if (payload.mode !== 'practice') return null;
+  if (typeof payload.exp !== 'number' || payload.exp < now) return null;
+  if (!payload.jti || !payload.playerId || !payload.manifestId) return null;
+  if (!Number.isInteger(payload.nextIndex) || payload.nextIndex < 0 || payload.nextIndex > 5) {
+    return null;
+  }
+  if (!Array.isArray(payload.points) || payload.points.length !== payload.nextIndex) return null;
+  if (payload.points.some((value) => !Number.isInteger(value))) return null;
+  return payload;
+}
