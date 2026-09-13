@@ -1,16 +1,30 @@
-import { describe, expect, it } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  finishPracticeReplay,
+  startPracticeReplay,
+  submitPracticeEvent,
+} from '@/features/game-engine/practice-service';
+import { getGame } from '@/features/game-engine/registry';
 import {
   issuePracticeToken,
   issueRunToken,
   readPracticeToken,
 } from '@/lib/anti-cheat/tokens';
+import { publicEvent } from '@/lib/daily/manifest';
+import { createStore, resetStore } from '@/lib/db/factory';
+import { goodAnswer, playFullRun, seedPlayer } from './helpers/official-run';
 
 const SECRET = 'a-test-secret-that-is-long-enough';
+const PLAYER = '11111111-1111-4111-8111-111111111111';
 
 describe('practice tokens', () => {
   const base = {
     playerId: 'player-1',
     manifestId: 'manifest-1',
+    mode: 'practice' as const,
     nextIndex: 0,
     points: [] as number[],
   };
@@ -44,5 +58,120 @@ describe('practice tokens', () => {
     const now = 1_700_000_000_000;
     const { token } = issuePracticeToken(base, SECRET, now);
     expect(readPracticeToken(token, SECRET, now + 46 * 60 * 1000)).toBeNull();
+  });
+});
+
+describe('practice replay', () => {
+  let directory: string;
+
+  beforeEach(async () => {
+    directory = await mkdtemp(path.join(tmpdir(), 'human-test-'));
+    process.env.HUMAN_DEV_DB = path.join(directory, 'db.json');
+    process.env.HUMAN_RUN_SECRET = 'test-run-secret-test-run-secret-01';
+    process.env.HUMAN_MANIFEST_SECRET = 'test-manifest-secret';
+    resetStore();
+    await seedPlayer(PLAYER);
+  });
+
+  afterEach(async () => {
+    resetStore();
+    await rm(directory, { recursive: true, force: true });
+  });
+
+  it('refuses start before the official run is finished', async () => {
+    await expect(startPracticeReplay(PLAYER)).rejects.toMatchObject({
+      code: 'PRACTICE_LOCKED',
+      status: 403,
+    });
+  });
+
+  it("returns today's five redacted events after the official run", async () => {
+    const { finished, manifest } = await playFullRun(PLAYER);
+    const started = await startPracticeReplay(PLAYER);
+    expect(started.firstScore).toBe(finished.run.totalScore);
+    expect(started.manifest.events.map((event) => event.gameId)).toEqual(
+      manifest.events.map((event) => event.gameId),
+    );
+    expect(started.manifest.events).toEqual(manifest.events.map(publicEvent));
+  });
+
+  it('scores a non-crowd event the same way official would', async () => {
+    const { manifest } = await playFullRun(PLAYER);
+    const started = await startPracticeReplay(PLAYER);
+    let token = started.token;
+    for (const event of manifest.events) {
+      const out = await submitPracticeEvent(PLAYER, {
+        token,
+        index: event.index,
+        result: goodAnswer(event),
+        durationMs: 8_000,
+      });
+      if (event.pillar !== 'crowd') {
+        const definition = getGame(event.gameId);
+        const result = definition.validateResult(event.config, goodAnswer(event));
+        const expected = definition.score(event.config, result);
+        expect(out.score.points).toBe(expected.points);
+        break;
+      }
+      token = out.token;
+    }
+  });
+
+  it('does not write crowd tallies, official score, or extra runs', async () => {
+    const { finished, manifest } = await playFullRun(PLAYER);
+    const store = createStore();
+    const crowdEvent = manifest.events.find((event) => event.pillar === 'crowd')!;
+    const before = await store.getCrowdTally(manifest.id, crowdEvent.index);
+    const started = await startPracticeReplay(PLAYER);
+    let token = started.token;
+    for (const event of manifest.events) {
+      const out = await submitPracticeEvent(PLAYER, {
+        token,
+        index: event.index,
+        result: goodAnswer(event),
+        durationMs: 8_000,
+      });
+      token = out.token;
+    }
+    const after = await store.getCrowdTally(manifest.id, crowdEvent.index);
+    expect(after).toEqual(before);
+    const official = await store.getOfficialRun(PLAYER, manifest.id);
+    expect(official?.totalScore).toBe(finished.run.totalScore);
+    const runs = await store.listFinishedRuns(manifest.id);
+    expect(runs).toHaveLength(1);
+  });
+
+  it('finish totals token points and returns the official first score', async () => {
+    const { finished, manifest } = await playFullRun(PLAYER);
+    const started = await startPracticeReplay(PLAYER);
+    let token = started.token;
+    const unofficial: number[] = [];
+    for (const event of manifest.events) {
+      const out = await submitPracticeEvent(PLAYER, {
+        token,
+        index: event.index,
+        result: goodAnswer(event),
+        durationMs: 8_000,
+      });
+      unofficial.push(out.score.points);
+      token = out.token;
+    }
+    const done = await finishPracticeReplay(PLAYER, token);
+    expect(done.firstScore).toBe(finished.run.totalScore);
+    expect(done.thisRun).toBeGreaterThan(0);
+    expect(done.events.map((event) => event.points)).toEqual(unofficial);
+  });
+
+  it('rejects a submit for the wrong index', async () => {
+    await playFullRun(PLAYER);
+    const started = await startPracticeReplay(PLAYER);
+    await expect(
+      submitPracticeEvent(PLAYER, {
+        token: started.token,
+        index: 1,
+        result: {},
+        durationMs: 8_000,
+      }),
+    ).rejects.toMatchObject({ code: 'OUT_OF_ORDER', status: 409 });
   });
 });
