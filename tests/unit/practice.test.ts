@@ -1,6 +1,8 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   finishPracticeReplay,
@@ -19,6 +21,7 @@ import { goodAnswer, playFullRun, seedPlayer } from './helpers/official-run';
 
 const SECRET = 'a-test-secret-that-is-long-enough';
 const PLAYER = '11111111-1111-4111-8111-111111111111';
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 describe('practice tokens', () => {
   const base = {
@@ -177,7 +180,32 @@ describe('practice replay', () => {
 });
 
 describe('removed scout route', () => {
-  it('does not ship /api/practice/score', async () => {
-    await expect(import('../../app/api/practice/score/route')).rejects.toThrow();
+  it('does not ship /api/practice/score', () => {
+    expect(existsSync(path.join(REPO_ROOT, 'app/api/practice/score/route.ts'))).toBe(false);
+  });
+});
+
+describe('admin family catalog', () => {
+  it('points PracticeBoard at admin start and score', () => {
+    const source = readFileSync(path.join(REPO_ROOT, 'features/practice/PracticeBoard.tsx'), 'utf8');
+    expect(source).toContain("'/api/admin/practice/start'");
+    expect(source).toContain("'/api/admin/practice/score'");
+    expect(source).not.toMatch(/track\(\s*'practice_started'/);
+  });
+
+  it('returns 404 JSON when the caller is not an admin', () => {
+    const start = readFileSync(path.join(REPO_ROOT, 'app/api/admin/practice/start/route.ts'), 'utf8');
+    const score = readFileSync(path.join(REPO_ROOT, 'app/api/admin/practice/score/route.ts'), 'utf8');
+    for (const source of [start, score]) {
+      expect(source).toContain('if (!isAdmin(player))');
+      expect(source).toContain("code: 'NO_PAGE'");
+      expect(source).toContain('status: 404');
+    }
+  });
+
+  it('still requires a finished official run before admin start', () => {
+    const start = readFileSync(path.join(REPO_ROOT, 'app/api/admin/practice/start/route.ts'), 'utf8');
+    expect(start).toContain('PRACTICE_LOCKED');
+    expect(start).toContain('practiceEvent');
   });
 });

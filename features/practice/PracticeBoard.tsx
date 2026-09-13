@@ -6,7 +6,6 @@ import { EventShell } from '@/features/game-engine/EventShell';
 import { GameField } from '@/features/game-engine/GameField';
 import { getGame } from '@/features/game-engine/registry';
 import { PILLAR_LABEL, type DailyEvent, type Pillar } from '@/features/game-engine/types';
-import { track } from '@/lib/analytics';
 import { apiPost } from '@/lib/client/api';
 
 interface Family {
@@ -35,8 +34,7 @@ export function PracticeBoard({
     setError(null);
     setResult(null);
     try {
-      const response = await apiPost<{ event: DailyEvent }>('/api/practice/start', { gameId });
-      track('practice_started', { gameId });
+      const response = await apiPost<{ event: DailyEvent }>('/api/admin/practice/start', { gameId });
       setEvent(response.event);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not start that.');
@@ -47,7 +45,7 @@ export function PracticeBoard({
     async (payload: unknown) => {
       if (!event) return;
       try {
-        const response = await apiPost<ScoreResponse>('/api/practice/score', {
+        const response = await apiPost<ScoreResponse>('/api/admin/practice/score', {
           gameId: event.gameId,
           seed: event.seed,
           difficulty: event.difficulty,

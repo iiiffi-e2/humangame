@@ -60,8 +60,7 @@ faster. See [`content-authoring.md`](content-authoring.md#setting-a-prior).
 
 1. **Look at the spread first.** One flat bar means everyone is getting the
    same score, which means the event is not measuring anything.
-2. **Play it.** `/practice` runs the same family on a random seed, so you can
-   see what players are seeing without spending an official run.
+2. **Play it.** `/admin/practice` runs the same family on a random seed. Players never see that catalog.
 3. **Void it** if it is genuinely unfair. It is cheap: the day survives.
 4. **Fix the family**, then regenerate the *future* days that use it. Never
    edit a frozen past day.
