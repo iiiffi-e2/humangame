@@ -1,8 +1,6 @@
 import Link from 'next/link';
-import { PracticeBoard } from '@/features/practice/PracticeBoard';
 import { BackLink } from '@/components/ui';
-import { GAMES_BY_PILLAR } from '@/features/game-engine/registry';
-import { PILLARS } from '@/features/game-engine/types';
+import { PracticeReplay } from '@/features/practice/PracticeReplay';
 import { requirePlayer } from '@/lib/auth/session';
 import { currentDateKey } from '@/lib/daily/reset';
 import { ensureManifest } from '@/lib/daily/service';
@@ -13,23 +11,14 @@ export const dynamic = 'force-dynamic';
 export const metadata = { title: 'Practice' };
 
 /**
- * Practice unlocks only after the official run. It uses random seeds and
- * writes nothing — no leaderboard, no streak, no stats. The point is to get
- * better at a family, not to farm a score.
+ * Practice unlocks only after the official run. It replays today's five
+ * and writes nothing — no leaderboard, no streak, no stats.
  */
 export default async function PracticePage() {
   const player = await requirePlayer();
   const manifest = await ensureManifest(currentDateKey());
   const run = await getStore().getOfficialRun(player.id, manifest.id);
   const unlocked = run?.status === 'finished';
-
-  const families = PILLARS.flatMap((pillar) =>
-    GAMES_BY_PILLAR[pillar].map((definition) => ({
-      id: definition.id,
-      name: definition.name,
-      pillar: definition.pillar,
-    })),
-  );
 
   if (!unlocked) {
     return (
@@ -56,5 +45,5 @@ export default async function PracticePage() {
     );
   }
 
-  return <PracticeBoard families={families} reducedMotion={player.settings.reduceMotion} />;
+  return <PracticeReplay reducedMotion={player.settings.reduceMotion} />;
 }

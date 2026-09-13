@@ -26,7 +26,8 @@ export interface AnalyticsEvents {
   rivalry_accepted: { target: string };
   crew_created: { crewId: string };
   crew_joined: { crewId: string };
-  practice_started: { gameId: string };
+  practice_started: { dayNumber: number };
+  practice_completed: { dayNumber: number; firstScore: number; thisRun: number };
   leaderboard_viewed: { tab: 'friends' | 'crews' | 'global' | 'country' | 'month' };
 }
 
