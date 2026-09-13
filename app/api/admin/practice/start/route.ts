@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { practiceEvent } from '@/features/game-engine/run-service';
 import { isKnownGame } from '@/features/game-engine/registry';
-import { todayKey } from '@/lib/daily/service';
+import { ensureManifest, todayKey } from '@/lib/daily/service';
 import { getStore } from '@/lib/db';
-import { ensureManifest } from '@/lib/daily/service';
 import { handler } from '@/lib/api';
 import { isAdmin } from '@/lib/auth/session';
 
@@ -22,7 +21,7 @@ const schema = z.object({ gameId: z.string().min(3).max(64) });
 export const POST = handler(
   {
     schema,
-    perPlayer: { name: 'practice', limit: 120, windowSeconds: 3600 },
+    perPlayer: { name: 'admin-practice', limit: 120, windowSeconds: 3600 },
   },
   async ({ body, player }) => {
     if (!isAdmin(player)) {

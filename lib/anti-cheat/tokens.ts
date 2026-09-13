@@ -1,5 +1,6 @@
 import 'server-only';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
+import { EVENTS_PER_RUN } from '@/lib/scoring';
 
 /**
  * Compact signed tokens: `base64url(payload).base64url(hmac)`.
@@ -110,7 +111,7 @@ export interface PracticeTokenPayload {
 }
 
 export function issuePracticeToken(
-  input: Omit<PracticeTokenPayload, 'jti' | 'iat' | 'exp'>,
+  input: Omit<PracticeTokenPayload, 'jti' | 'iat' | 'exp' | 'mode'>,
   secret: string,
   now: number = Date.now(),
 ): { token: string; payload: PracticeTokenPayload } {
@@ -134,7 +135,7 @@ export function readPracticeToken(
   if (payload.mode !== 'practice') return null;
   if (typeof payload.exp !== 'number' || payload.exp < now) return null;
   if (!payload.jti || !payload.playerId || !payload.manifestId) return null;
-  if (!Number.isInteger(payload.nextIndex) || payload.nextIndex < 0 || payload.nextIndex > 5) {
+  if (!Number.isInteger(payload.nextIndex) || payload.nextIndex < 0 || payload.nextIndex > EVENTS_PER_RUN) {
     return null;
   }
   if (!Array.isArray(payload.points) || payload.points.length !== payload.nextIndex) return null;

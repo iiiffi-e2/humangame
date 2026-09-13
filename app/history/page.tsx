@@ -163,7 +163,7 @@ export default async function HistoryPage() {
 
             <div className="pad" style={{ paddingBottom: 28 }}>
               <Link href="/practice" className="btn btn-ghost" style={{ textDecoration: 'none' }}>
-                <span>Practice {history.weakest ? PILLAR_LABEL[history.weakest] : 'anything'}</span>
+                <span>Practice {history.weakest ? PILLAR_LABEL[history.weakest] : 'today'}</span>
                 <span aria-hidden>&rarr;</span>
               </Link>
             </div>

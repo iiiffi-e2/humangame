@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { POST as adminScore } from '@/app/api/admin/practice/score/route';
+import { POST as adminStart } from '@/app/api/admin/practice/start/route';
 import {
   finishPracticeReplay,
   startPracticeReplay,
@@ -15,6 +17,8 @@ import {
   issueRunToken,
   readPracticeToken,
 } from '@/lib/anti-cheat/tokens';
+import { GUEST_HEADER } from '@/lib/auth/constants';
+import { CSRF_HEADER } from '@/lib/client/constants';
 import { publicEvent } from '@/lib/daily/manifest';
 import { createStore, resetStore } from '@/lib/db/factory';
 import { goodAnswer, playFullRun, seedPlayer } from './helpers/official-run';
@@ -23,11 +27,22 @@ const SECRET = 'a-test-secret-that-is-long-enough';
 const PLAYER = '11111111-1111-4111-8111-111111111111';
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
+function adminPracticeRequest(pathName: string, body: unknown): Request {
+  return new Request(`http://localhost:3000${pathName}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      [CSRF_HEADER]: '1',
+      [GUEST_HEADER]: PLAYER,
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 describe('practice tokens', () => {
   const base = {
     playerId: 'player-1',
     manifestId: 'manifest-1',
-    mode: 'practice' as const,
     nextIndex: 0,
     points: [] as number[],
   };
@@ -120,11 +135,12 @@ describe('practice replay', () => {
     }
   });
 
-  it('does not write crowd tallies, official score, or extra runs', async () => {
+  it('does not write crowd tallies, official score, stats, or extra runs', async () => {
     const { finished, manifest } = await playFullRun(PLAYER);
     const store = createStore();
     const crowdEvent = manifest.events.find((event) => event.pillar === 'crowd')!;
     const before = await store.getCrowdTally(manifest.id, crowdEvent.index);
+    const statsBefore = await store.getStats(PLAYER);
     const started = await startPracticeReplay(PLAYER);
     let token = started.token;
     for (const event of manifest.events) {
@@ -136,8 +152,10 @@ describe('practice replay', () => {
       });
       token = out.token;
     }
+    await finishPracticeReplay(PLAYER, token);
     const after = await store.getCrowdTally(manifest.id, crowdEvent.index);
     expect(after).toEqual(before);
+    expect(await store.getStats(PLAYER)).toEqual(statsBefore);
     const official = await store.getOfficialRun(PLAYER, manifest.id);
     expect(official?.totalScore).toBe(finished.run.totalScore);
     const runs = await store.listFinishedRuns(manifest.id);
@@ -177,6 +195,25 @@ describe('practice replay', () => {
       }),
     ).rejects.toMatchObject({ code: 'OUT_OF_ORDER', status: 409 });
   });
+
+  it('rejects finish before every event is in', async () => {
+    await playFullRun(PLAYER);
+    const started = await startPracticeReplay(PLAYER);
+    await expect(finishPracticeReplay(PLAYER, started.token)).rejects.toMatchObject({
+      code: 'INCOMPLETE',
+      status: 400,
+    });
+  });
+
+  it('rejects a token issued to a different player', async () => {
+    const other = '22222222-2222-4222-8222-222222222222';
+    await playFullRun(PLAYER);
+    const started = await startPracticeReplay(PLAYER);
+    await expect(finishPracticeReplay(other, started.token)).rejects.toMatchObject({
+      code: 'BAD_TOKEN',
+      status: 401,
+    });
+  });
 });
 
 describe('removed scout route', () => {
@@ -193,13 +230,34 @@ describe('admin family catalog', () => {
     expect(source).not.toMatch(/track\(\s*'practice_started'/);
   });
 
-  it('returns 404 JSON when the caller is not an admin', () => {
-    const start = readFileSync(path.join(REPO_ROOT, 'app/api/admin/practice/start/route.ts'), 'utf8');
-    const score = readFileSync(path.join(REPO_ROOT, 'app/api/admin/practice/score/route.ts'), 'utf8');
-    for (const source of [start, score]) {
-      expect(source).toContain('if (!isAdmin(player))');
-      expect(source).toContain("code: 'NO_PAGE'");
-      expect(source).toContain('status: 404');
+  it('returns 404 when a non-admin POSTs to admin start or score', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'human-admin-'));
+    process.env.HUMAN_DEV_DB = path.join(directory, 'db.json');
+    process.env.HUMAN_RUN_SECRET = 'test-run-secret-test-run-secret-01';
+    process.env.HUMAN_MANIFEST_SECRET = 'test-manifest-secret';
+    process.env.HUMAN_ADMIN_EMAILS = 'admin@example.com';
+    resetStore();
+    await seedPlayer(PLAYER);
+    try {
+      const start = await adminStart(
+        adminPracticeRequest('/api/admin/practice/start', { gameId: 'nerve.dead-stop' }),
+      );
+      expect(start.status).toBe(404);
+      await expect(start.json()).resolves.toMatchObject({ code: 'NO_PAGE' });
+
+      const score = await adminScore(
+        adminPracticeRequest('/api/admin/practice/score', {
+          gameId: 'nerve.dead-stop',
+          seed: 'seed-1',
+          difficulty: 0.5,
+          result: {},
+        }),
+      );
+      expect(score.status).toBe(404);
+      await expect(score.json()).resolves.toMatchObject({ code: 'NO_PAGE' });
+    } finally {
+      resetStore();
+      await rm(directory, { recursive: true, force: true });
     }
   });
 

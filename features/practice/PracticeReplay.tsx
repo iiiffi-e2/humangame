@@ -96,7 +96,7 @@ export function PracticeReplay({ reducedMotion }: { reducedMotion: boolean }) {
         resetToLanding(TOKEN_EXPIRED);
         return;
       }
-      if (error instanceof ApiError && error.status === 403) {
+      if (error instanceof ApiError && error.code === 'PRACTICE_LOCKED') {
         setPhase({ kind: 'error', locked: true });
         return;
       }
@@ -589,12 +589,12 @@ function VoidedEvent({
         </h1>
         <p style={{ margin: '20px 0 0', fontSize: 16, lineHeight: 1.4, maxWidth: 320, textWrap: 'pretty' }}>
           A defect made today&rsquo;s {PILLAR_LABEL[event.pillar].toUpperCase()} event unfair. Nobody is
-          scored on it, and your run is still ranked out of <strong>10,000</strong>.
+          scored on it.
         </p>
       </div>
       <div className="pad" style={{ paddingBottom: 28 }}>
         <button type="button" className="btn" onClick={onContinue}>
-          <span>{nextPillar ? `Continue to ${PILLAR_LABEL[nextPillar]}` : 'See your score'}</span>
+          <span>{nextPillar ? `Continue to ${PILLAR_LABEL[nextPillar]}` : 'See this run'}</span>
           <span aria-hidden>&rarr;</span>
         </button>
       </div>

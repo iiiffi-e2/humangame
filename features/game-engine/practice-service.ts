@@ -68,7 +68,7 @@ async function crowdContext(
 export async function startPracticeReplay(playerId: string): Promise<StartPracticeOutput> {
   const { manifest, official } = await requireFinishedOfficial(playerId);
   const { token } = issuePracticeToken(
-    { playerId, manifestId: manifest.id, nextIndex: 0, points: [], mode: 'practice' },
+    { playerId, manifestId: manifest.id, nextIndex: 0, points: [] },
     serverEnv().runSecret,
   );
   return {
@@ -87,12 +87,13 @@ export async function submitPracticeEvent(
   playerId: string,
   input: { token: string; index: number; result: unknown; durationMs: number },
 ): Promise<SubmitPracticeOutput> {
+  // Timing is not rejected on submit — same as official.
   const payload = readOwnedToken(input.token, playerId);
   const { manifest } = await requireFinishedOfficial(playerId);
   if (payload.manifestId !== manifest.id) {
     throw new RunError('Practice token is missing or expired.', 'BAD_TOKEN', 401);
   }
-  if (input.index !== payload.nextIndex || input.index < 0 || input.index > 4) {
+  if (input.index !== payload.nextIndex || input.index < 0 || input.index > EVENTS_PER_RUN - 1) {
     throw new RunError(
       `Expected event ${payload.nextIndex}, received ${input.index}.`,
       'OUT_OF_ORDER',
@@ -125,7 +126,7 @@ export async function submitPracticeEvent(
   const nextIndex = payload.nextIndex + 1;
   const points = [...payload.points, score.points];
   const { token } = issuePracticeToken(
-    { playerId, manifestId: manifest.id, nextIndex, points, mode: 'practice' },
+    { playerId, manifestId: manifest.id, nextIndex, points },
     serverEnv().runSecret,
   );
 
