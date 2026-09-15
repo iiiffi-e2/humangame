@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_EVENT_POINTS,
   MAX_RUN_POINTS,
+  applySpeed,
   categoricalScore,
+  closenessLabel,
   distanceScore,
   headlineFor,
+  paceFor,
   percentageScore,
   pillarPercent,
   rankingScore,
+  readElapsedMs,
   sequenceScore,
   tierFor,
   toPoints,
@@ -42,6 +46,53 @@ describe('distanceScore', () => {
 
   it('rejects nonsense without throwing', () => {
     expect(distanceScore({ error: Number.NaN, perfect: 1, zero: 2 })).toBe(0);
+  });
+});
+
+describe('applySpeed', () => {
+  const band = { elapsedMs: 0, parMs: 5_000, slowMs: 22_000, speedWeight: 0.28 };
+
+  it('leaves accuracy alone when the player is at or under par', () => {
+    expect(applySpeed(0.9, { ...band, elapsedMs: 4_000 })).toBe(0.9);
+    expect(applySpeed(1, { ...band, elapsedMs: 5_000 })).toBe(1);
+  });
+
+  it('keeps a floor of accuracy × (1 − speedWeight) when the clock is gone', () => {
+    expect(applySpeed(1, { ...band, elapsedMs: 60_000 })).toBeCloseTo(0.72, 5);
+  });
+
+  it('never lets a fast miss beat a slow hit', () => {
+    const fastMiss = applySpeed(0.4, { ...band, elapsedMs: 800 });
+    const slowHit = applySpeed(1, { ...band, elapsedMs: 21_999 });
+    expect(slowHit).toBeGreaterThan(fastMiss);
+  });
+
+  it('stays zero when accuracy is zero, no matter how fast', () => {
+    expect(applySpeed(0, { ...band, elapsedMs: 200 })).toBe(0);
+  });
+});
+
+describe('pace and closeness copy', () => {
+  it('names pace from the same par/slow band the points use', () => {
+    expect(paceFor(3_000, 5_000, 22_000)).toBe('Quick');
+    expect(paceFor(9_000, 5_000, 22_000)).toBe('On pace');
+    expect(paceFor(18_000, 5_000, 22_000)).toBe('A bit slow');
+    expect(paceFor(30_000, 5_000, 22_000)).toBe('Slow');
+  });
+
+  it('names closeness from accuracy, not from the speed-adjusted score', () => {
+    expect(closenessLabel(1)).toBe('Spot on');
+    expect(closenessLabel(0.9)).toBe('Close');
+    expect(closenessLabel(0.5)).toBe('Off');
+    expect(closenessLabel(0.1)).toBe('Missed');
+  });
+});
+
+describe('readElapsedMs', () => {
+  it('clamps a real clock and falls back to slow when the client omits it', () => {
+    expect(readElapsedMs(1234.8, 22_000)).toBe(1235);
+    expect(readElapsedMs(undefined, 22_000)).toBe(22_000);
+    expect(readElapsedMs(-40, 22_000)).toBe(0);
   });
 });
 

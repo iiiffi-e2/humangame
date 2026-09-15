@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ErasedGameProps } from '@/features/game-engine/EventShell';
+import { useElapsed } from '@/features/game-engine/use-elapsed';
 import type { NextConfig, NextTile } from './next';
 import type { OrderConfig } from './order';
 import type { RotateConfig, RotateShape } from './rotate';
@@ -12,6 +13,7 @@ export function OrderField({ config, onComplete }: ErasedGameProps) {
   const typed = config as OrderConfig;
   const [items, setItems] = useState(typed.items);
   const [held, setHeld] = useState<string | null>(null);
+  const elapsed = useElapsed();
 
   const move = (id: string, direction: -1 | 1) => {
     setItems((current) => {
@@ -105,7 +107,7 @@ export function OrderField({ config, onComplete }: ErasedGameProps) {
         <button
           type="button"
           className="btn"
-          onClick={() => onComplete({ order: items.map((item) => item.id) })}
+          onClick={() => onComplete({ order: items.map((item) => item.id), elapsedMs: elapsed() })}
         >
           <span>Lock order</span>
           <span aria-hidden>&rarr;</span>

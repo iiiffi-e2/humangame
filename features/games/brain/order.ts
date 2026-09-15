@@ -1,5 +1,5 @@
 import { createRng } from '@/lib/rng';
-import { finalize, rankingScore } from '@/lib/scoring';
+import { finalizeTimed, rankingScore, readElapsedMs, SPEED_BAND } from '@/lib/scoring';
 import type { GameDefinition } from '@/features/game-engine/types';
 import { ORDER_SETS } from './content';
 
@@ -15,6 +15,7 @@ export interface OrderConfig {
 
 export interface OrderResult {
   order: string[];
+  elapsedMs: number;
 }
 
 export const order: GameDefinition<OrderConfig, OrderResult> = {
@@ -70,13 +71,16 @@ export const order: GameDefinition<OrderConfig, OrderResult> = {
       }
     }
     if (new Set(value).size !== value.length) throw new Error('order: duplicate item');
-    return { order: value as string[] };
+    return {
+      order: value as string[],
+      elapsedMs: readElapsedMs((result as Partial<OrderResult> | null)?.elapsedMs, SPEED_BAND.order.slowMs),
+    };
   },
 
   score(config, result) {
-    const normalized = rankingScore({ expected: config.solution, actual: result.order });
+    const accuracy = rankingScore({ expected: config.solution, actual: result.order });
     const exact = result.order.filter((id, index) => config.solution[index] === id).length;
-    return finalize(exact, normalized);
+    return finalizeTimed(exact, accuracy, result.elapsedMs, SPEED_BAND.order);
   },
 
   timingWindow: () => [800, 90_000],

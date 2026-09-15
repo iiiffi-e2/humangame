@@ -1,5 +1,5 @@
 import { createRng } from '@/lib/rng';
-import { finalize, sequenceScore } from '@/lib/scoring';
+import { finalizeTimed, readElapsedMs, sequenceScore, SPEED_BAND } from '@/lib/scoring';
 import type { GameDefinition } from '@/features/game-engine/types';
 
 export interface FlashGridConfig {
@@ -13,6 +13,7 @@ export interface FlashGridConfig {
 
 export interface FlashGridResult {
   picked: number[];
+  elapsedMs: number;
 }
 
 export const flashGrid: GameDefinition<FlashGridConfig, FlashGridResult> = {
@@ -60,16 +61,19 @@ export const flashGrid: GameDefinition<FlashGridConfig, FlashGridResult> = {
         throw new Error('flash-grid: pick out of range');
       }
     }
-    return { picked: [...new Set(picked)] };
+    return {
+      picked: [...new Set(picked)],
+      elapsedMs: readElapsedMs((result as Partial<FlashGridResult> | null)?.elapsedMs, SPEED_BAND.memory.slowMs),
+    };
   },
 
   score(config, result) {
     // Order does not matter here, only the set of tiles.
     const expected = [...config.cells].sort((a, b) => a - b);
     const actual = [...result.picked].sort((a, b) => a - b);
-    const normalized = sequenceScore({ expected, actual, setWeight: 1 });
+    const accuracy = sequenceScore({ expected, actual, setWeight: 1 });
     const hits = actual.filter((cell) => config.cells.includes(cell)).length;
-    return finalize(hits, normalized);
+    return finalizeTimed(hits, accuracy, result.elapsedMs, SPEED_BAND.memory);
   },
 
   timingWindow: (config) => [config.flashMs, config.flashMs + 60_000],

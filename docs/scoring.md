@@ -7,11 +7,12 @@ exactly.
 
 Nothing is ever scored from wall-clock network latency. Where a family uses
 time, it is `performance.now()` measured inside the play field, submitted as a
-duration.
+duration. Missing `elapsedMs` is treated as `slowMs`, so omitting the clock
+cannot mint a perfect.
 
 ---
 
-## The five curves
+## The six curves
 
 ### 1. Continuous error — `distanceScore`
 
@@ -87,6 +88,25 @@ An answer with a missing or unknown id scores zero rather than throwing.
 For EYE/PERCENT and CROWD/SPLIT: `distanceScore` on a 0–100 scale, with a
 2-point perfect band and a zero point between 30 and 40 depending on
 difficulty. Being 2 points out is a hit; being 40 out is a miss.
+
+### 6. Accuracy, then speed — `applySpeed`
+
+For every family that is not Nerve. Accuracy is scored first; then:
+
+```
+quality = accuracy × ((1 − speedWeight) + speedWeight × speedBonus)
+```
+
+`speedBonus` is `distanceScore` on `elapsed − par`. Default `speedWeight` is
+0.28, so a slow perfect pays 1,440 / 2,000. A fast miss still cannot beat a
+slow hit. Nerve is exempt: the clock already *is* the puzzle.
+
+Bands live in `SPEED_BAND` (not on stored config), so a day frozen before this
+change re-scores the same way as a new one.
+
+The mid-run card shows closeness (`Spot on` / `Close` / `Off` / `Missed`) and
+pace (`Quick` / `On pace` / `A bit slow` / `Slow`). The exact miss (`2.0% off`)
+waits until the final reveal.
 
 ---
 

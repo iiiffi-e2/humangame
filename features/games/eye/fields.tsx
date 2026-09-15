@@ -2,14 +2,15 @@
 
 import { useCallback, useRef, useState } from 'react';
 import type { ErasedGameProps } from '@/features/game-engine/EventShell';
+import { useElapsed } from '@/features/game-engine/use-elapsed';
 import type { AngleConfig } from './angle';
 import type { HalfConfig } from './half';
 import type { PercentConfig } from './percent';
 
 /**
- * EYE play fields — pure estimation, no clock. Each one commits on an
- * explicit LOCK so nobody loses a run to a stray touch, and each one is
- * adjustable from the keyboard.
+ * EYE play fields — visual estimation, committed with LOCK. Percent and Angle
+ * have no +/− so the target cannot be counted to; Half keeps nudges because
+ * there is no number on the page. Keyboard arrows still work.
  */
 
 export function HalfField({ config, onComplete }: ErasedGameProps) {
@@ -17,6 +18,7 @@ export function HalfField({ config, onComplete }: ErasedGameProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [fraction, setFraction] = useState(0.5);
   const [touched, setTouched] = useState(false);
+  const elapsed = useElapsed();
 
   const setFromPointer = useCallback((clientX: number, clientY: number) => {
     const element = trackRef.current;
@@ -85,7 +87,7 @@ export function HalfField({ config, onComplete }: ErasedGameProps) {
           setTouched(true);
           setFraction((value) => Math.max(0, Math.min(1, value + delta * 0.005)));
         }}
-        onLock={() => onComplete({ fraction })}
+        onLock={() => onComplete({ fraction, elapsedMs: elapsed() })}
       />
     </>
   );
@@ -95,6 +97,7 @@ export function PercentField({ config, onComplete }: ErasedGameProps) {
   const typed = config as PercentConfig;
   const tankRef = useRef<HTMLDivElement | null>(null);
   const [value, setValue] = useState(typed.startPercent);
+  const elapsed = useElapsed();
 
   const setFromPointer = useCallback((clientY: number) => {
     const element = tankRef.current;
@@ -184,8 +187,7 @@ export function PercentField({ config, onComplete }: ErasedGameProps) {
       </div>
       <LockBar
         label="Lock it in"
-        onAdjust={(delta) => setValue((current) => Math.max(0, Math.min(100, current + delta)))}
-        onLock={() => onComplete({ valuePercent: value })}
+        onLock={() => onComplete({ valuePercent: value, elapsedMs: elapsed() })}
       />
     </>
   );
@@ -195,6 +197,7 @@ export function AngleField({ config, onComplete }: ErasedGameProps) {
   const typed = config as AngleConfig;
   const dialRef = useRef<HTMLDivElement | null>(null);
   const [deg, setDeg] = useState(typed.startDeg);
+  const elapsed = useElapsed();
 
   const setFromPointer = useCallback((clientX: number, clientY: number) => {
     const element = dialRef.current;
@@ -277,24 +280,29 @@ export function AngleField({ config, onComplete }: ErasedGameProps) {
               transform: `rotate(${deg}deg)`,
             }}
           />
-          <span className="num" style={{ fontSize: 44 }}>
-            {deg}&deg;
-          </span>
+          <span
+            aria-hidden
+            style={{
+              width: 18,
+              height: 18,
+              borderRadius: '50%',
+              background: 'var(--color-ink)',
+            }}
+          />
         </div>
       </div>
       <LockBar
         label="Lock the angle"
-        onAdjust={(delta) => setDeg((current) => (current + delta + 360) % 360)}
-        onLock={() => onComplete({ deg })}
+        onLock={() => onComplete({ deg, elapsedMs: elapsed() })}
       />
     </>
   );
 }
 
 /**
- * The commit bar. The two nudge buttons are not decoration: they are what
- * makes a pixel-precise estimate reachable with a thumb, a stylus or a
- * keyboard rather than only a steady hand.
+ * The commit bar. Nudge buttons are optional: Half keeps them so a thumb
+ * can land a midpoint. Percent and Angle omit them so the estimate cannot
+ * be counted to with +1 taps.
  */
 function LockBar({
   label,
@@ -304,29 +312,33 @@ function LockBar({
 }: {
   label: string;
   onLock: () => void;
-  onAdjust: (delta: number) => void;
+  onAdjust?: (delta: number) => void;
   disabled?: boolean;
 }) {
   return (
     <div className="pad" style={{ padding: '16px 24px 28px', display: 'flex', gap: 10 }}>
-      <button
-        type="button"
-        aria-label="Nudge down"
-        className="btn btn-ghost"
-        style={{ width: 64, minWidth: 64, justifyContent: 'center' }}
-        onClick={() => onAdjust(-1)}
-      >
-        &minus;
-      </button>
-      <button
-        type="button"
-        aria-label="Nudge up"
-        className="btn btn-ghost"
-        style={{ width: 64, minWidth: 64, justifyContent: 'center' }}
-        onClick={() => onAdjust(1)}
-      >
-        +
-      </button>
+      {onAdjust ? (
+        <>
+          <button
+            type="button"
+            aria-label="Nudge down"
+            className="btn btn-ghost"
+            style={{ width: 64, minWidth: 64, justifyContent: 'center' }}
+            onClick={() => onAdjust(-1)}
+          >
+            &minus;
+          </button>
+          <button
+            type="button"
+            aria-label="Nudge up"
+            className="btn btn-ghost"
+            style={{ width: 64, minWidth: 64, justifyContent: 'center' }}
+            onClick={() => onAdjust(1)}
+          >
+            +
+          </button>
+        </>
+      ) : null}
       <button type="button" className="btn" onClick={onLock} disabled={disabled}>
         <span>{label}</span>
         <span aria-hidden>&rarr;</span>

@@ -115,6 +115,7 @@ export function FinalReveal({
             value={row.value}
             best={row.pillar === bestPillar}
             onDark
+            caption={row.voided ? 'Voided' : row.detail}
           />
         ))}
       </div>

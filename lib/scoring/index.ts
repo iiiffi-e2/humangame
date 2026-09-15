@@ -22,7 +22,29 @@ export interface ScoreResult {
   points: number;
   /** Short tier word shown on the interstitial. */
   label: string;
+  /** Accuracy before the speed multiplier. Equals normalized when unused. */
+  accuracy?: number;
+  /** Player-facing closeness chip. Omitted for Nerve (exact metric instead). */
+  closeness?: string;
+  /** Player-facing pace chip. Omitted for Nerve. */
+  pace?: Pace;
 }
+
+export type Pace = 'Quick' | 'On pace' | 'A bit slow' | 'Slow';
+
+/** Medium-time bands. Scoring reads these constants, not stored config. */
+export const SPEED_BAND = {
+  eye: { parMs: 5_000, slowMs: 22_000, speedWeight: 0.28 },
+  memory: { parMs: 8_000, slowMs: 25_000, speedWeight: 0.28 },
+  order: { parMs: 12_000, slowMs: 40_000, speedWeight: 0.25 },
+  crowd: { parMs: 5_000, slowMs: 20_000, speedWeight: 0.25 },
+} as const;
+
+export type SpeedBand = {
+  parMs: number;
+  slowMs: number;
+  speedWeight: number;
+};
 
 export type ScoreTier =
   | 'Flawless'
@@ -96,6 +118,71 @@ export function finalize(
   };
 }
 
+/**
+ * Accuracy, then a bounded speed multiplier. A slow perfect still beats a
+ * fast miss; sitting on the event can no longer pay a full 2,000.
+ */
+export function applySpeed(
+  accuracy: number,
+  options: {
+    elapsedMs: number;
+    parMs: number;
+    slowMs: number;
+    speedWeight?: number;
+  },
+): number {
+  const { elapsedMs, parMs, slowMs, speedWeight = 0.28 } = options;
+  const quality = clamp01(accuracy);
+  if (quality === 0) return 0;
+  const speed = distanceScore({
+    error: Math.max(0, elapsedMs - parMs),
+    perfect: 0,
+    zero: Math.max(1, slowMs - parMs),
+    falloff: 1.1,
+  });
+  return clamp01(quality * (1 - speedWeight + speedWeight * speed));
+}
+
+export function paceFor(elapsedMs: number, parMs: number, slowMs: number): Pace {
+  if (!Number.isFinite(elapsedMs) || elapsedMs <= parMs) return 'Quick';
+  const span = Math.max(1, slowMs - parMs);
+  const t = (elapsedMs - parMs) / span;
+  if (t < 0.4) return 'On pace';
+  if (t < 1) return 'A bit slow';
+  return 'Slow';
+}
+
+export function closenessLabel(accuracy: number): string {
+  const quality = clamp01(accuracy);
+  if (quality >= 0.995) return 'Spot on';
+  if (quality >= 0.82) return 'Close';
+  if (quality >= 0.42) return 'Off';
+  return 'Missed';
+}
+
+/** Client omitted the clock → no speed bonus. */
+export function readElapsedMs(value: unknown, fallbackMs: number, maxMs = 180_000): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallbackMs;
+  return Math.max(0, Math.min(maxMs, Math.round(value)));
+}
+
+/** Score a non-Nerve event: closeness from accuracy, points after speed. */
+export function finalizeTimed(
+  rawMetric: number,
+  accuracy: number,
+  elapsedMs: number,
+  band: SpeedBand,
+  label?: string,
+): ScoreResult {
+  const normalized = applySpeed(accuracy, { elapsedMs, ...band });
+  return {
+    ...finalize(rawMetric, normalized, label),
+    accuracy: clamp01(accuracy),
+    closeness: closenessLabel(accuracy),
+    pace: paceFor(elapsedMs, band.parMs, band.slowMs),
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* Curve 1 — continuous error                                          */
 /* ------------------------------------------------------------------ */
@@ -163,14 +250,7 @@ export function categoricalScore(options: CategoricalScoreOptions): number {
     wrongFloor = 0,
   } = options;
   if (!correct) return clamp01(wrongFloor);
-  const base = 1 - speedWeight;
-  const speed = distanceScore({
-    error: Math.max(0, elapsedMs - parMs),
-    perfect: 0,
-    zero: Math.max(1, slowMs - parMs),
-    falloff: 1.1,
-  });
-  return clamp01(base + speedWeight * speed);
+  return applySpeed(1, { elapsedMs, parMs, slowMs, speedWeight });
 }
 
 /* ------------------------------------------------------------------ */

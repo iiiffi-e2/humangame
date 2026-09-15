@@ -1,5 +1,5 @@
 import { createRng } from '@/lib/rng';
-import { distanceScore, finalize } from '@/lib/scoring';
+import { distanceScore, finalizeTimed, readElapsedMs, SPEED_BAND } from '@/lib/scoring';
 import type { GameDefinition } from '@/features/game-engine/types';
 
 export interface AngleConfig {
@@ -13,6 +13,7 @@ export interface AngleConfig {
 
 export interface AngleResult {
   deg: number;
+  elapsedMs: number;
 }
 
 /** Shortest signed distance between two bearings, in -180..180. */
@@ -54,18 +55,21 @@ export const angle: GameDefinition<AngleConfig, AngleResult> = {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
       throw new Error('angle: deg missing');
     }
-    return { deg: ((value % 360) + 360) % 360 };
+    return {
+      deg: ((value % 360) + 360) % 360,
+      elapsedMs: readElapsedMs((result as Partial<AngleResult> | null)?.elapsedMs, SPEED_BAND.eye.slowMs),
+    };
   },
 
   score(config, result) {
     const error = angleDelta(result.deg, config.targetDeg);
-    const normalized = distanceScore({
+    const accuracy = distanceScore({
       error,
       perfect: config.perfect,
       zero: config.zero,
       falloff: 1.5,
     });
-    return finalize(Math.round(error * 10) / 10, normalized);
+    return finalizeTimed(Math.round(error * 10) / 10, accuracy, result.elapsedMs, SPEED_BAND.eye);
   },
 
   timingWindow: () => [300, 45_000],

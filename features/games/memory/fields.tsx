@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ErasedGameProps } from '@/features/game-engine/EventShell';
+import { useElapsed } from '@/features/game-engine/use-elapsed';
 import type { FlashGridConfig } from './flash-grid';
 import type { SequenceConfig, SequenceIcon } from './sequence';
 import type { WhatMovedConfig } from './what-moved';
@@ -46,6 +47,7 @@ export function FlashGridField({ config, onComplete }: ErasedGameProps) {
   const [phase, setPhase] = useState<Phase>('ready');
   const [picked, setPicked] = useState<number[]>([]);
   const doneRef = useRef(false);
+  const elapsed = useElapsed(phase === 'recall');
 
   useEffect(() => {
     if (phase !== 'show') return;
@@ -61,7 +63,7 @@ export function FlashGridField({ config, onComplete }: ErasedGameProps) {
       if (next.length >= typed.cells.length) {
         doneRef.current = true;
         // Let the last tile paint before the interstitial takes over.
-        setTimeout(() => onComplete({ picked: next }), 140);
+        setTimeout(() => onComplete({ picked: next, elapsedMs: elapsed() }), 140);
       }
       return next;
     });
@@ -229,6 +231,7 @@ export function SequenceField({ config, onComplete }: ErasedGameProps) {
   const [step, setStep] = useState(0);
   const [entered, setEntered] = useState<string[]>([]);
   const doneRef = useRef(false);
+  const elapsed = useElapsed(phase === 'recall');
 
   useEffect(() => {
     if (phase !== 'show') return;
@@ -255,7 +258,7 @@ export function SequenceField({ config, onComplete }: ErasedGameProps) {
     setEntered(next);
     if (next.length >= typed.sequence.length) {
       doneRef.current = true;
-      setTimeout(() => onComplete({ entered: next }), 140);
+      setTimeout(() => onComplete({ entered: next, elapsedMs: elapsed() }), 140);
     }
   };
 

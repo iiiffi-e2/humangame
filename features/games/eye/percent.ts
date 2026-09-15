@@ -1,5 +1,5 @@
 import { createRng } from '@/lib/rng';
-import { finalize, percentageScore } from '@/lib/scoring';
+import { finalizeTimed, percentageScore, readElapsedMs, SPEED_BAND } from '@/lib/scoring';
 import type { GameDefinition } from '@/features/game-engine/types';
 
 export interface PercentConfig {
@@ -13,6 +13,7 @@ export interface PercentConfig {
 
 export interface PercentResult {
   valuePercent: number;
+  elapsedMs: number;
 }
 
 export const percent: GameDefinition<PercentConfig, PercentResult> = {
@@ -49,19 +50,24 @@ export const percent: GameDefinition<PercentConfig, PercentResult> = {
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
       throw new Error('percent: value out of range');
     }
-    return { valuePercent: Math.round(value * 10) / 10 };
+    return {
+      valuePercent: Math.round(value * 10) / 10,
+      elapsedMs: readElapsedMs((result as Partial<PercentResult> | null)?.elapsedMs, SPEED_BAND.eye.slowMs),
+    };
   },
 
   score(config, result) {
-    const normalized = percentageScore({
+    const accuracy = percentageScore({
       predicted: result.valuePercent,
       actual: config.targetPercent,
       perfect: config.perfect,
       zero: config.zero,
     });
-    return finalize(
+    return finalizeTimed(
       Math.round((result.valuePercent - config.targetPercent) * 10) / 10,
-      normalized,
+      accuracy,
+      result.elapsedMs,
+      SPEED_BAND.eye,
     );
   },
 

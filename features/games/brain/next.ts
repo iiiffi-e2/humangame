@@ -1,5 +1,5 @@
 import { createRng } from '@/lib/rng';
-import { categoricalScore, finalize } from '@/lib/scoring';
+import { finalizeTimed } from '@/lib/scoring';
 import type { GameDefinition } from '@/features/game-engine/types';
 
 /** A tile is a 3x3 bitmask, drawn as filled cells. */
@@ -120,14 +120,12 @@ export const next: GameDefinition<NextConfig, NextResult> = {
   },
 
   score(config, result) {
-    const normalized = categoricalScore({
-      correct: result.pickedId === config.answerId,
-      elapsedMs: result.elapsedMs,
-      parMs: config.parMs,
-      slowMs: config.slowMs,
-      speedWeight: 0.32,
-    });
-    return finalize(result.elapsedMs, normalized);
+    return finalizeTimed(
+      result.elapsedMs,
+      result.pickedId === config.answerId ? 1 : 0,
+      result.elapsedMs,
+      { parMs: config.parMs, slowMs: config.slowMs, speedWeight: 0.32 },
+    );
   },
 
   timingWindow: () => [400, 120_000],

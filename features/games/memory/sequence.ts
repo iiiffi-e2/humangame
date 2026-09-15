@@ -1,5 +1,5 @@
 import { createRng } from '@/lib/rng';
-import { finalize, sequenceScore } from '@/lib/scoring';
+import { finalizeTimed, readElapsedMs, sequenceScore, SPEED_BAND } from '@/lib/scoring';
 import type { GameDefinition } from '@/features/game-engine/types';
 
 export const SEQUENCE_ICONS = ['bolt', 'moon', 'eye', 'wave', 'ring', 'cross'] as const;
@@ -16,6 +16,7 @@ export interface SequenceConfig {
 
 export interface SequenceResult {
   entered: string[];
+  elapsedMs: number;
 }
 
 export const sequence: GameDefinition<SequenceConfig, SequenceResult> = {
@@ -63,11 +64,14 @@ export const sequence: GameDefinition<SequenceConfig, SequenceResult> = {
         throw new Error('sequence: unknown icon');
       }
     }
-    return { entered: entered as string[] };
+    return {
+      entered: entered as string[],
+      elapsedMs: readElapsedMs((result as Partial<SequenceResult> | null)?.elapsedMs, SPEED_BAND.memory.slowMs),
+    };
   },
 
   score(config, result) {
-    const normalized = sequenceScore({
+    const accuracy = sequenceScore({
       expected: config.sequence as readonly string[],
       actual: result.entered,
       setWeight: 0.25,
@@ -77,7 +81,7 @@ export const sequence: GameDefinition<SequenceConfig, SequenceResult> = {
       if (result.entered[i] === config.sequence[i]) correctPrefix += 1;
       else break;
     }
-    return finalize(correctPrefix, normalized);
+    return finalizeTimed(correctPrefix, accuracy, result.elapsedMs, SPEED_BAND.memory);
   },
 
   timingWindow: (config) => [

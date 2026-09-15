@@ -19,28 +19,28 @@ export function goodAnswer(event: DailyEvent): unknown {
       return { releaseMs: ((target - start) / rate) * 1000 };
     }
     case 'eye.half':
-      return { fraction: config.target as number };
+      return { fraction: config.target as number, elapsedMs: 2_000 };
     case 'eye.percent':
-      return { valuePercent: config.targetPercent as number };
+      return { valuePercent: config.targetPercent as number, elapsedMs: 2_000 };
     case 'eye.angle':
-      return { deg: config.targetDeg as number };
+      return { deg: config.targetDeg as number, elapsedMs: 2_000 };
     case 'memory.flash-grid':
-      return { picked: config.cells as number[] };
+      return { picked: config.cells as number[], elapsedMs: 3_000 };
     case 'memory.what-moved':
       return { pickedId: config.movedId as string, elapsedMs: 2000 };
     case 'memory.sequence':
-      return { entered: config.sequence as string[] };
+      return { entered: config.sequence as string[], elapsedMs: 3_000 };
     case 'brain.order':
-      return { order: config.solution as string[] };
+      return { order: config.solution as string[], elapsedMs: 4_000 };
     case 'brain.next':
       return { pickedId: config.answerId as string, elapsedMs: 3000 };
     case 'brain.rotate':
       return { pickedId: config.answerId as string, elapsedMs: 3000 };
     case 'crowd.majority':
     case 'crowd.avoid':
-      return { pickedId: (config.options as Array<{ id: string }>)[0]?.id };
+      return { pickedId: (config.options as Array<{ id: string }>)[0]?.id, elapsedMs: 2_000 };
     case 'crowd.split':
-      return { predicted: config.priorPercent as number };
+      return { predicted: config.priorPercent as number, elapsedMs: 2_000 };
     default:
       throw new Error(`No answer for ${event.gameId}`);
   }

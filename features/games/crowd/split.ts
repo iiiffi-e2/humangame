@@ -1,5 +1,5 @@
 import { createRng } from '@/lib/rng';
-import { finalize, percentageScore } from '@/lib/scoring';
+import { finalizeTimed, percentageScore, readElapsedMs, SPEED_BAND } from '@/lib/scoring';
 import { blendPercentage } from '@/lib/scoring/crowd';
 import type { GameDefinition } from '@/features/game-engine/types';
 import { SPLIT_QUESTIONS } from './content';
@@ -17,6 +17,7 @@ export interface SplitConfig {
 
 export interface SplitResult {
   predicted: number;
+  elapsedMs: number;
 }
 
 export const split: GameDefinition<SplitConfig, SplitResult> = {
@@ -54,18 +55,26 @@ export const split: GameDefinition<SplitConfig, SplitResult> = {
     if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 100) {
       throw new Error('split: predicted out of range');
     }
-    return { predicted: Math.round(value) };
+    return {
+      predicted: Math.round(value),
+      elapsedMs: readElapsedMs((result as Partial<SplitResult> | null)?.elapsedMs, SPEED_BAND.crowd.slowMs),
+    };
   },
 
   score(config, result, context) {
     const actual = blendPercentage(config.priorPercent, config.priorWeight, context?.crowd);
-    const normalized = percentageScore({
+    const accuracy = percentageScore({
       predicted: result.predicted,
       actual,
       perfect: config.perfect,
       zero: config.zero,
     });
-    return finalize(Math.round((result.predicted - actual) * 10) / 10, normalized);
+    return finalizeTimed(
+      Math.round((result.predicted - actual) * 10) / 10,
+      accuracy,
+      result.elapsedMs,
+      SPEED_BAND.crowd,
+    );
   },
 
   timingWindow: () => [400, 120_000],

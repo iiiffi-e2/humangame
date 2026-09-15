@@ -126,6 +126,7 @@ export function PillarBar({
   value,
   best,
   onDark = false,
+  caption,
 }: {
   pillar: Pillar;
   /** 0..100. */
@@ -133,39 +134,56 @@ export function PillarBar({
   /** Highlight this row as the player's strongest. */
   best?: boolean;
   onDark?: boolean;
+  /** Exact metric shown after the run, e.g. "2.0% off". */
+  caption?: string;
 }) {
   const track = onDark ? 'rgba(244,240,232,.15)' : 'rgba(17,17,17,.12)';
   const fill = best ? 'var(--color-chartreuse)' : onDark ? 'var(--color-bone)' : 'var(--color-ink)';
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: '64px 1fr 40px',
-        gap: 12,
-        alignItems: 'center',
-      }}
-    >
-      <span className="mono" style={{ color: best ? 'var(--color-chartreuse)' : undefined }}>
-        {PILLAR_NAME[pillar]}
-      </span>
-      <div style={{ height: 12, background: track }}>
-        <div
-          className="anim-bar"
-          style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: '100%', background: fill }}
-        />
-      </div>
-      <span
-        className="num"
+    <div>
+      <div
         style={{
-          fontSize: 20,
-          textAlign: 'right',
-          color: best ? 'var(--color-chartreuse)' : undefined,
+          display: 'grid',
+          gridTemplateColumns: '64px 1fr 40px',
+          gap: 12,
+          alignItems: 'center',
         }}
       >
-        {value}
-      </span>
+        <span className="mono" style={{ color: best ? 'var(--color-chartreuse)' : undefined }}>
+          {PILLAR_NAME[pillar]}
+        </span>
+        <div style={{ height: 12, background: track }}>
+          <div
+            className="anim-bar"
+            style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: '100%', background: fill }}
+          />
+        </div>
+        <span
+          className="num"
+          style={{
+            fontSize: 20,
+            textAlign: 'right',
+            color: best ? 'var(--color-chartreuse)' : undefined,
+          }}
+        >
+          {value}
+        </span>
+      </div>
+      {caption ? (
+        <p
+          className="mono"
+          style={{
+            margin: '4px 0 0 76px',
+            opacity: 0.55,
+            textTransform: 'none',
+            letterSpacing: '0.02em',
+          }}
+        >
+          {caption}
+        </p>
+      ) : null}
       <span className="sr-only">
-        {PILLAR_NAME[pillar]}: {value} out of 100
+        {PILLAR_NAME[pillar]}: {value} out of 100{caption ? `, ${caption}` : ''}
       </span>
     </div>
   );

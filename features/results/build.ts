@@ -7,6 +7,7 @@ import { rankedScores } from '@/features/game-engine/run-service';
 import { getStore } from '@/lib/db';
 import type { Player, Run } from '@/lib/db/types';
 import { pillarPercent, tierFor } from '@/lib/scoring';
+import { exactMetric } from '@/features/results/event-copy';
 
 /**
  * Everything the final reveal needs, in one shape.
@@ -21,6 +22,8 @@ export interface PillarRow {
   /** 0..100 for the bar. */
   value: number;
   label: string;
+  /** Exact miss, shown only after the run is finished. */
+  detail: string;
   voided: boolean;
 }
 
@@ -69,6 +72,7 @@ export async function buildResultPayload(run: Run, viewer: Player): Promise<Resu
       points: event?.points ?? 0,
       value: pillarPercent(event?.points ?? 0),
       label: event?.label ?? '—',
+      detail: event ? exactMetric(event.gameId, event.rawMetric) : '—',
       voided: event?.voided ?? false,
     };
   });

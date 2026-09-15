@@ -11,6 +11,8 @@ import { PILLAR_LABEL } from './types';
 import { FitText } from '@/components/FitText';
 import { track } from '@/lib/analytics';
 import { apiPost } from '@/lib/client/api';
+import { headlineFor, type ScoreResult } from '@/lib/scoring';
+import { eventChips } from '@/features/results/event-copy';
 
 /**
  * Drives one official run from start to reveal.
@@ -31,7 +33,7 @@ interface StartResponse {
 }
 
 interface EventResponse {
-  score: { rawMetric: number; normalized: number; points: number; label: string };
+  score: ScoreResult;
   pillar: Pillar;
   gameId: string;
   index: number;
@@ -340,7 +342,7 @@ function Interstitial({
   }, [onAdvance]);
 
   const headline = headlineFor(result.score.normalized);
-  const metric = metricLabel(result);
+  const chips = eventChips(result.gameId, result.score);
 
   return (
     <main
@@ -379,9 +381,9 @@ function Interstitial({
         </div>
         <div className="mono" style={{ marginTop: 24, display: 'flex', gap: 14, flexWrap: 'wrap' }}>
           <span style={{ background: 'var(--color-ink)', color: 'var(--color-chartreuse)', padding: '6px 10px' }}>
-            {metric}
+            {chips.primary}
           </span>
-          <span style={{ padding: '6px 0' }}>{result.score.label}</span>
+          <span style={{ padding: '6px 0' }}>{chips.secondary}</span>
         </div>
       </div>
       <div
@@ -407,46 +409,6 @@ function Interstitial({
       </div>
     </main>
   );
-}
-
-function headlineFor(normalized: number): string {
-  if (normalized >= 0.995) return 'Perfect.';
-  if (normalized >= 0.93) return 'Nailed it.';
-  if (normalized >= 0.82) return 'Sharp.';
-  if (normalized >= 0.64) return 'Solid.';
-  if (normalized >= 0.42) return 'Human.';
-  if (normalized >= 0.18) return 'Shaky.';
-  return 'Cooked.';
-}
-
-/** Turn a family's raw metric into the tiny line under the score. */
-function metricLabel(result: EventResponse): string {
-  const value = result.score.rawMetric;
-  switch (result.gameId) {
-    case 'nerve.dead-stop':
-      return `${Math.abs(Math.round(value))} ms ${value >= 0 ? 'late' : 'early'}`;
-    case 'nerve.grow':
-    case 'nerve.crosshair':
-      return `${Math.abs(value).toFixed(1)} off`;
-    case 'eye.percent':
-    case 'eye.half':
-      return `${Math.abs(value).toFixed(1)}% off`;
-    case 'eye.angle':
-      return `${Math.abs(value).toFixed(1)}° off`;
-    case 'memory.flash-grid':
-      return `${value} right`;
-    case 'memory.sequence':
-      return `${value} in a row`;
-    case 'brain.order':
-      return `${value} in place`;
-    case 'crowd.split':
-      return `${Math.abs(value).toFixed(0)} points out`;
-    case 'crowd.majority':
-    case 'crowd.avoid':
-      return `${value.toFixed(0)}% went there`;
-    default:
-      return `${(value / 1000).toFixed(2)}s`;
-  }
 }
 
 function LoadingRun() {

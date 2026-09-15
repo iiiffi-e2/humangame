@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { ErasedGameProps } from '@/features/game-engine/EventShell';
+import { useElapsed } from '@/features/game-engine/use-elapsed';
 import type { AvoidConfig } from './avoid';
 import type { MajorityConfig } from './majority';
 import type { SplitConfig } from './split';
@@ -17,10 +18,11 @@ function OptionList({
   hint,
 }: {
   options: Array<{ id: string; label: string }>;
-  onPick: (id: string) => void;
+  onPick: (id: string, elapsedMs: number) => void;
   hint: string;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
+  const elapsed = useElapsed();
   return (
     <div
       style={{
@@ -42,7 +44,7 @@ function OptionList({
             onClick={() => {
               if (picked) return;
               setPicked(option.id);
-              setTimeout(() => onPick(option.id), 130);
+              setTimeout(() => onPick(option.id, elapsed()), 130);
             }}
             style={{
               display: 'flex',
@@ -76,7 +78,7 @@ export function MajorityField({ config, onComplete }: ErasedGameProps) {
     <OptionList
       options={typed.options}
       hint="pick"
-      onPick={(id) => onComplete({ pickedId: id })}
+      onPick={(id, elapsedMs) => onComplete({ pickedId: id, elapsedMs })}
     />
   );
 }
@@ -87,7 +89,7 @@ export function AvoidField({ config, onComplete }: ErasedGameProps) {
     <OptionList
       options={typed.options}
       hint="alone?"
-      onPick={(id) => onComplete({ pickedId: id })}
+      onPick={(id, elapsedMs) => onComplete({ pickedId: id, elapsedMs })}
     />
   );
 }
@@ -95,6 +97,7 @@ export function AvoidField({ config, onComplete }: ErasedGameProps) {
 export function SplitField({ config, onComplete }: ErasedGameProps) {
   const typed = config as SplitConfig;
   const [value, setValue] = useState(50);
+  const elapsed = useElapsed();
 
   return (
     <>
@@ -150,7 +153,7 @@ export function SplitField({ config, onComplete }: ErasedGameProps) {
       </div>
 
       <div className="pad" style={{ padding: '16px 24px 28px' }}>
-        <button type="button" className="btn" onClick={() => onComplete({ predicted: value })}>
+        <button type="button" className="btn" onClick={() => onComplete({ predicted: value, elapsedMs: elapsed() })}>
           <span>Call it</span>
           <span aria-hidden>&rarr;</span>
         </button>

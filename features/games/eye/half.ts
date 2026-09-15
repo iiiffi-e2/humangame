@@ -1,5 +1,5 @@
 import { createRng } from '@/lib/rng';
-import { distanceScore, finalize } from '@/lib/scoring';
+import { distanceScore, finalizeTimed, readElapsedMs, SPEED_BAND } from '@/lib/scoring';
 import type { GameDefinition } from '@/features/game-engine/types';
 
 export interface HalfConfig {
@@ -16,6 +16,7 @@ export interface HalfConfig {
 export interface HalfResult {
   /** Where the player tapped, as a fraction along the line. */
   fraction: number;
+  elapsedMs: number;
 }
 
 export const half: GameDefinition<HalfConfig, HalfResult> = {
@@ -47,18 +48,21 @@ export const half: GameDefinition<HalfConfig, HalfResult> = {
     if (typeof value !== 'number' || !Number.isFinite(value) || value < -0.5 || value > 1.5) {
       throw new Error('half: fraction out of range');
     }
-    return { fraction: Math.round(value * 10_000) / 10_000 };
+    return {
+      fraction: Math.round(value * 10_000) / 10_000,
+      elapsedMs: readElapsedMs((result as Partial<HalfResult> | null)?.elapsedMs, SPEED_BAND.eye.slowMs),
+    };
   },
 
   score(config, result) {
     const error = result.fraction - config.target;
-    const normalized = distanceScore({
+    const accuracy = distanceScore({
       error,
       perfect: config.perfect,
       zero: config.zero,
       falloff: 1.5,
     });
-    return finalize(Math.round(error * 1000) / 10, normalized);
+    return finalizeTimed(Math.round(error * 1000) / 10, accuracy, result.elapsedMs, SPEED_BAND.eye);
   },
 
   timingWindow: () => [200, 40_000],

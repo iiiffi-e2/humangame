@@ -1,5 +1,5 @@
 import { createRng } from '@/lib/rng';
-import { finalize } from '@/lib/scoring';
+import { finalizeTimed, readElapsedMs, SPEED_BAND } from '@/lib/scoring';
 import { blendShares, crowdAlignment, crowdWinner } from '@/lib/scoring/crowd';
 import type { GameDefinition } from '@/features/game-engine/types';
 import { AVOID_QUESTIONS, type CrowdOption } from './content';
@@ -14,6 +14,7 @@ export interface AvoidConfig {
 
 export interface AvoidResult {
   pickedId: string;
+  elapsedMs: number;
 }
 
 export const avoid: GameDefinition<AvoidConfig, AvoidResult> = {
@@ -49,7 +50,10 @@ export const avoid: GameDefinition<AvoidConfig, AvoidResult> = {
     if (typeof value !== 'string' || !config.options.some((option) => option.id === value)) {
       throw new Error('avoid: unknown pickedId');
     }
-    return { pickedId: value };
+    return {
+      pickedId: value,
+      elapsedMs: readElapsedMs((result as Partial<AvoidResult> | null)?.elapsedMs, SPEED_BAND.crowd.slowMs),
+    };
   },
 
   score(config, result, context) {
@@ -57,11 +61,11 @@ export const avoid: GameDefinition<AvoidConfig, AvoidResult> = {
       { shares: config.priorShares, weight: config.priorWeight },
       context?.crowd,
     );
-    const normalized = crowdAlignment(shares, result.pickedId, 'least');
+    const accuracy = crowdAlignment(shares, result.pickedId, 'least');
     const pickedShare = Math.round((shares[result.pickedId] ?? 0) * 1000) / 10;
     const loneliest = crowdWinner(shares, 'least');
     const label = loneliest === result.pickedId ? 'Alone at the top' : undefined;
-    return finalize(pickedShare, normalized, label);
+    return finalizeTimed(pickedShare, accuracy, result.elapsedMs, SPEED_BAND.crowd, label);
   },
 
   timingWindow: () => [300, 120_000],

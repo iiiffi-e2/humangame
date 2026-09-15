@@ -83,10 +83,10 @@ describe('crowd families score against the blend', () => {
     const config = majority.createConfig('seed', 0.5) as MajorityConfig;
     const outsider = Object.entries(config.priorShares).sort((a, b) => a[1] - b[1])[0]?.[0] as string;
 
-    const cold = majority.score(config, { pickedId: outsider }, { crowd: { counts: {}, total: 0 } });
+    const cold = majority.score(config, { pickedId: outsider, elapsedMs: 1_000 }, { crowd: { counts: {}, total: 0 } });
     const warm = majority.score(
       config,
-      { pickedId: outsider },
+      { pickedId: outsider, elapsedMs: 1_000 },
       { crowd: { counts: { [outsider]: 5_000 }, total: 5_000 } },
     );
     expect(warm.points).toBeGreaterThan(cold.points);
@@ -95,8 +95,8 @@ describe('crowd families score against the blend', () => {
 
   it('split scores the distance from the blended figure', () => {
     const config = split.createConfig('seed', 0.5) as SplitConfig;
-    const spotOn = split.score(config, { predicted: config.priorPercent }, undefined);
-    const wild = split.score(config, { predicted: (config.priorPercent + 50) % 100 }, undefined);
+    const spotOn = split.score(config, { predicted: config.priorPercent, elapsedMs: 1_000 }, undefined);
+    const wild = split.score(config, { predicted: (config.priorPercent + 50) % 100, elapsedMs: 1_000 }, undefined);
     expect(spotOn.points).toBe(2000);
     expect(wild.points).toBeLessThan(spotOn.points);
   });
@@ -106,15 +106,15 @@ describe('crowd families score against the blend', () => {
     const first = config.options[0]?.id as string;
     const rest = config.options.slice(1).map((option) => option.id);
     const counts = Object.fromEntries(rest.map((id) => [id, 3_000]));
-    const alone = avoid.score(config, { pickedId: first }, { crowd: { counts, total: 9_000 } });
-    const crowded = avoid.score(config, { pickedId: rest[0] as string }, { crowd: { counts, total: 9_000 } });
+    const alone = avoid.score(config, { pickedId: first, elapsedMs: 1_000 }, { crowd: { counts, total: 9_000 } });
+    const crowded = avoid.score(config, { pickedId: rest[0] as string, elapsedMs: 1_000 }, { crowd: { counts, total: 9_000 } });
     expect(alone.points).toBe(2000);
     expect(crowded.points).toBeLessThan(alone.points);
   });
 
   it('gives every player a scoreable result even as the first player of the day', () => {
     const config = majority.createConfig('seed-2', 0.5) as MajorityConfig;
-    const result = majority.score(config, { pickedId: config.options[0]?.id as string }, undefined);
+    const result = majority.score(config, { pickedId: config.options[0]?.id as string, elapsedMs: 1_000 }, undefined);
     expect(result.points).toBeGreaterThan(0);
     expect(Number.isInteger(result.points)).toBe(true);
   });

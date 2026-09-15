@@ -1,5 +1,5 @@
 import { createRng } from '@/lib/rng';
-import { categoricalScore, finalize } from '@/lib/scoring';
+import { finalizeTimed } from '@/lib/scoring';
 import type { GameDefinition } from '@/features/game-engine/types';
 
 export interface WhatMovedItem {
@@ -92,14 +92,11 @@ export const whatMoved: GameDefinition<WhatMovedConfig, WhatMovedResult> = {
 
   score(config, result) {
     const correct = result.pickedId === config.movedId;
-    const normalized = categoricalScore({
-      correct,
-      elapsedMs: result.elapsedMs,
+    return finalizeTimed(result.elapsedMs, correct ? 1 : 0, result.elapsedMs, {
       parMs: config.parMs,
       slowMs: config.slowMs,
       speedWeight: 0.28,
     });
-    return finalize(result.elapsedMs, normalized);
   },
 
   timingWindow: (config) => [config.previewMs, config.previewMs + 60_000],
