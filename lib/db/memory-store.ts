@@ -10,7 +10,9 @@ import type {
   CrowdTallyRow,
   DataStore,
   ModerationReport,
+  Notification,
   Player,
+  PlayerBlock,
   PlayerStats,
   Rivalry,
   Run,
@@ -28,6 +30,8 @@ interface Snapshot {
   challenges: ChallengeLink[];
   challengePlays: ChallengePlay[];
   reports: ModerationReport[];
+  blocks: PlayerBlock[];
+  notifications: Notification[];
 }
 
 const EMPTY: Snapshot = {
@@ -42,6 +46,8 @@ const EMPTY: Snapshot = {
   challenges: [],
   challengePlays: [],
   reports: [],
+  blocks: [],
+  notifications: [],
 };
 
 function clone<T>(value: T): T {
@@ -79,7 +85,13 @@ export class MemoryStore implements DataStore {
     try {
       const raw = await readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(raw) as Partial<Snapshot>;
-      this.data = { ...clone(EMPTY), ...parsed };
+      this.data = {
+        ...clone(EMPTY),
+        ...parsed,
+        blocks: parsed.blocks ?? [],
+        notifications: parsed.notifications ?? [],
+        reports: parsed.reports ?? [],
+      };
     } catch {
       this.data = clone(EMPTY);
     }
@@ -439,6 +451,16 @@ export class MemoryStore implements DataStore {
     });
   }
 
+  updateCrew(id: string, patch: Partial<Crew>): Promise<Crew> {
+    return this.write((data) => {
+      const index = data.crews.findIndex((crew) => crew.id === id);
+      if (index < 0) throw new Error(`Crew ${id} not found`);
+      const updated = { ...(data.crews[index] as Crew), ...patch };
+      data.crews[index] = updated;
+      return clone(updated);
+    });
+  }
+
   getCrewBySlug(slug: string): Promise<Crew | null> {
     return this.read((data) => clone(data.crews.find((crew) => crew.slug === slug) ?? null));
   }
@@ -534,6 +556,89 @@ export class MemoryStore implements DataStore {
   listReports(status?: ModerationReport['status']): Promise<ModerationReport[]> {
     return this.read((data) =>
       clone(status ? data.reports.filter((report) => report.status === status) : data.reports),
+    );
+  }
+
+  updateReport(id: string, patch: Partial<ModerationReport>): Promise<ModerationReport> {
+    return this.write((data) => {
+      const index = data.reports.findIndex((report) => report.id === id);
+      if (index < 0) throw new Error(`Report ${id} not found`);
+      const updated = { ...(data.reports[index] as ModerationReport), ...patch };
+      data.reports[index] = updated;
+      return clone(updated);
+    });
+  }
+
+  blockPlayer(blockerId: string, blockedId: string): Promise<PlayerBlock> {
+    return this.write((data) => {
+      const existing = data.blocks.find(
+        (block) => block.blockerId === blockerId && block.blockedId === blockedId,
+      );
+      if (existing) return clone(existing);
+      const block: PlayerBlock = {
+        blockerId,
+        blockedId,
+        createdAt: new Date().toISOString(),
+      };
+      data.blocks.push(block);
+      return clone(block);
+    });
+  }
+
+  unblockPlayer(blockerId: string, blockedId: string): Promise<void> {
+    return this.write((data) => {
+      data.blocks = data.blocks.filter(
+        (block) => !(block.blockerId === blockerId && block.blockedId === blockedId),
+      );
+    });
+  }
+
+  listBlockedIds(playerId: string): Promise<string[]> {
+    return this.read((data) =>
+      data.blocks.filter((block) => block.blockerId === playerId).map((block) => block.blockedId),
+    );
+  }
+
+  isEitherBlocked(a: string, b: string): Promise<boolean> {
+    return this.read((data) =>
+      data.blocks.some(
+        (block) =>
+          (block.blockerId === a && block.blockedId === b) ||
+          (block.blockerId === b && block.blockedId === a),
+      ),
+    );
+  }
+
+  createNotification(notification: Notification): Promise<Notification> {
+    return this.write((data) => {
+      data.notifications.push(clone(notification));
+      return clone(notification);
+    });
+  }
+
+  listNotifications(playerId: string, limit = 50): Promise<Notification[]> {
+    return this.read((data) =>
+      clone(
+        data.notifications
+          .filter((entry) => entry.playerId === playerId)
+          .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+          .slice(0, limit),
+      ),
+    );
+  }
+
+  markNotificationsRead(playerId: string): Promise<void> {
+    const now = new Date().toISOString();
+    return this.write((data) => {
+      for (const entry of data.notifications) {
+        if (entry.playerId === playerId && !entry.readAt) entry.readAt = now;
+      }
+    });
+  }
+
+  listLinkedPlayers(): Promise<Player[]> {
+    return this.read((data) =>
+      clone(data.players.filter((player) => !player.isGuest && Boolean(player.email))),
     );
   }
 }

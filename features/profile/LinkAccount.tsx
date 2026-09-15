@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BackLink } from '@/components/ui';
 import { apiPost } from '@/lib/client/api';
 
@@ -41,6 +41,40 @@ export function LinkAccount({
   const [stage, setStage] = useState<Stage>(isGuest ? 'idle' : 'linked');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!supabaseConfigured || !isGuest) return;
+    void (async () => {
+      const { createClient } = await import('@supabase/supabase-js');
+      const client = createClient(supabaseUrl, supabaseAnonKey);
+      const { data } = await client.auth.getSession();
+      if (!data.session) return;
+      try {
+        await apiPost('/api/auth/link', { accessToken: data.session.access_token });
+        setStage('linked');
+        setMessage('Linked. Your runs travel with you now.');
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : 'Could not finish linking.');
+      }
+    })();
+  }, [isGuest, supabaseAnonKey, supabaseConfigured, supabaseUrl]);
+
+  const oauth = async (provider: 'google' | 'apple') => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const client = createClient(supabaseUrl, supabaseAnonKey);
+      const { error } = await client.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: `${window.location.origin}/profile/link` },
+      });
+      if (error) throw new Error(error.message);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not start that sign-in.');
+      setBusy(false);
+    }
+  };
 
   const sendCode = async () => {
     setBusy(true);
@@ -159,13 +193,22 @@ export function LinkAccount({
             </button>
           )}
 
-          {!supabaseConfigured ? (
+          {supabaseConfigured ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+              <button type="button" className="btn" disabled={busy} onClick={() => void oauth('google')}>
+                <span>Continue with Google</span>
+              </button>
+              <button type="button" className="btn" disabled={busy} onClick={() => void oauth('apple')}>
+                <span>Continue with Apple</span>
+              </button>
+            </div>
+          ) : (
             <p className="mono" style={{ opacity: 0.55, textTransform: 'none', letterSpacing: '0.02em', lineHeight: 1.6 }}>
               {devMode
                 ? 'No auth provider is configured, so this uses the documented dev-mode path. Set NEXT_PUBLIC_SUPABASE_URL and the keys to enable email, Google, Apple or passkeys.'
                 : 'No sign-in provider is configured on this deployment.'}
             </p>
-          ) : null}
+          )}
         </div>
       ) : null}
 

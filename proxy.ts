@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, GUEST_HEADER } from '@/lib/auth/constants';
 import { signTokenEdge, verifyTokenEdge } from '@/lib/auth/edge-token';
+import { DEV_RUN_SECRET } from '@/lib/env';
 
 /**
  * Guest-first identity.
@@ -15,8 +16,7 @@ import { signTokenEdge, verifyTokenEdge } from '@/lib/auth/edge-token';
  * is forwarded on a request header.
  */
 export default async function proxy(request: NextRequest) {
-  const secret =
-    process.env.HUMAN_RUN_SECRET ?? 'human-dev-run-secret-do-not-use-in-production';
+  const secret = process.env.HUMAN_RUN_SECRET ?? DEV_RUN_SECRET;
   const existing = request.cookies.get(GUEST_COOKIE)?.value;
 
   if (existing) {
@@ -45,5 +45,5 @@ export default async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|icons/|manifest.webmanifest|sw.js).*)'],
+  matcher: ['/((?!_next/|__nextjs|favicon.ico|icons/|manifest.webmanifest|sw.js).*)'],
 };

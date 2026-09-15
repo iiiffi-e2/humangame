@@ -9,7 +9,9 @@ import type {
   CrowdTallyRow,
   DataStore,
   ModerationReport,
+  Notification,
   Player,
+  PlayerBlock,
   PlayerStats,
   Rivalry,
   Run,
@@ -35,6 +37,7 @@ function toPlayer(row: Row): Player {
     email: row.email ?? null,
     authProvider: row.auth_provider ?? 'guest',
     isAdmin: row.is_admin ?? false,
+    hiddenFromBoards: row.hidden_from_boards ?? false,
     settings: row.settings,
     createdAt: row.created_at,
     firstDayNumber: row.first_day_number ?? 1,
@@ -52,6 +55,7 @@ function fromPlayer(player: Partial<Player>): Row {
   if (player.email !== undefined) row.email = player.email;
   if (player.authProvider !== undefined) row.auth_provider = player.authProvider;
   if (player.isAdmin !== undefined) row.is_admin = player.isAdmin;
+  if (player.hiddenFromBoards !== undefined) row.hidden_from_boards = player.hiddenFromBoards;
   if (player.settings !== undefined) row.settings = player.settings;
   if (player.createdAt !== undefined) row.created_at = player.createdAt;
   if (player.firstDayNumber !== undefined) row.first_day_number = player.firstDayNumber;
@@ -558,6 +562,7 @@ export class SupabaseStore implements DataStore {
       inviteCode: row.invite_code,
       ownerId: row.owner_id,
       createdAt: row.created_at,
+      hiddenFromBoards: row.hidden_from_boards ?? false,
     };
   }
 
@@ -569,10 +574,20 @@ export class SupabaseStore implements DataStore {
       invite_code: crew.inviteCode,
       owner_id: crew.ownerId,
       created_at: crew.createdAt,
+      hidden_from_boards: crew.hiddenFromBoards ?? false,
     });
     if (error?.code === '23505') throw new Error('Crew name already taken');
     fail('createCrew', error);
     return crew;
+  }
+
+  async updateCrew(id: string, patch: Partial<Crew>): Promise<Crew> {
+    const row: Row = {};
+    if (patch.name !== undefined) row.name = patch.name;
+    if (patch.hiddenFromBoards !== undefined) row.hidden_from_boards = patch.hiddenFromBoards;
+    const { data, error } = await this.client.from('crews').update(row).eq('id', id).select('*').single();
+    fail('updateCrew', error);
+    return this.toCrew(data);
   }
 
   async getCrewBySlug(slug: string): Promise<Crew | null> {
@@ -752,5 +767,119 @@ export class SupabaseStore implements DataStore {
       status: row.status,
       createdAt: row.created_at,
     }));
+  }
+
+  async updateReport(id: string, patch: Partial<ModerationReport>): Promise<ModerationReport> {
+    const row: Row = {};
+    if (patch.status !== undefined) row.status = patch.status;
+    if (patch.reason !== undefined) row.reason = patch.reason;
+    const { data, error } = await this.client
+      .from('moderation_reports')
+      .update(row)
+      .eq('id', id)
+      .select('*')
+      .single();
+    fail('updateReport', error);
+    return {
+      id: data.id,
+      reporterId: data.reporter_id,
+      subjectType: data.subject_type,
+      subjectId: data.subject_id,
+      reason: data.reason,
+      status: data.status,
+      createdAt: data.created_at,
+    };
+  }
+
+  async blockPlayer(blockerId: string, blockedId: string): Promise<PlayerBlock> {
+    const createdAt = new Date().toISOString();
+    const { error } = await this.client.from('player_blocks').upsert(
+      { blocker_id: blockerId, blocked_id: blockedId, created_at: createdAt },
+      { onConflict: 'blocker_id,blocked_id' },
+    );
+    fail('blockPlayer', error);
+    return { blockerId, blockedId, createdAt };
+  }
+
+  async unblockPlayer(blockerId: string, blockedId: string): Promise<void> {
+    const { error } = await this.client
+      .from('player_blocks')
+      .delete()
+      .eq('blocker_id', blockerId)
+      .eq('blocked_id', blockedId);
+    fail('unblockPlayer', error);
+  }
+
+  async listBlockedIds(playerId: string): Promise<string[]> {
+    const { data, error } = await this.client
+      .from('player_blocks')
+      .select('blocked_id')
+      .eq('blocker_id', playerId);
+    fail('listBlockedIds', error);
+    return (data ?? []).map((row) => row.blocked_id as string);
+  }
+
+  async isEitherBlocked(a: string, b: string): Promise<boolean> {
+    const { data, error } = await this.client
+      .from('player_blocks')
+      .select('blocker_id')
+      .or(
+        `and(blocker_id.eq.${a},blocked_id.eq.${b}),and(blocker_id.eq.${b},blocked_id.eq.${a})`,
+      )
+      .limit(1);
+    fail('isEitherBlocked', error);
+    return (data ?? []).length > 0;
+  }
+
+  async createNotification(notification: Notification): Promise<Notification> {
+    const { error } = await this.client.from('notifications').insert({
+      id: notification.id,
+      player_id: notification.playerId,
+      kind: notification.kind,
+      body: notification.body,
+      href: notification.href,
+      read_at: notification.readAt,
+      created_at: notification.createdAt,
+    });
+    fail('createNotification', error);
+    return notification;
+  }
+
+  async listNotifications(playerId: string, limit = 50): Promise<Notification[]> {
+    const { data, error } = await this.client
+      .from('notifications')
+      .select('*')
+      .eq('player_id', playerId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    fail('listNotifications', error);
+    return (data ?? []).map((row) => ({
+      id: row.id,
+      playerId: row.player_id,
+      kind: row.kind,
+      body: row.body,
+      href: row.href,
+      readAt: row.read_at,
+      createdAt: row.created_at,
+    }));
+  }
+
+  async markNotificationsRead(playerId: string): Promise<void> {
+    const { error } = await this.client
+      .from('notifications')
+      .update({ read_at: new Date().toISOString() })
+      .eq('player_id', playerId)
+      .is('read_at', null);
+    fail('markNotificationsRead', error);
+  }
+
+  async listLinkedPlayers(): Promise<Player[]> {
+    const { data, error } = await this.client
+      .from('players')
+      .select('*')
+      .eq('is_guest', false)
+      .not('email', 'is', null);
+    fail('listLinkedPlayers', error);
+    return (data ?? []).map((row) => toPlayer(row));
   }
 }

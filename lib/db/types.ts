@@ -33,6 +33,8 @@ export interface Player {
   email: string | null;
   authProvider: 'guest' | 'email' | 'google' | 'apple' | 'passkey';
   isAdmin: boolean;
+  /** Admin hide from public boards. Not a ban — the player can still play. */
+  hiddenFromBoards?: boolean;
   settings: PlayerSettings;
   createdAt: string;
   firstDayNumber: number;
@@ -110,6 +112,8 @@ export interface Crew {
   inviteCode: string;
   ownerId: string;
   createdAt: string;
+  /** Admin hide. The crew can still play; it is omitted from named boards. */
+  hiddenFromBoards?: boolean;
 }
 
 export interface CrewMember {
@@ -154,6 +158,28 @@ export interface ModerationReport {
   subjectId: string;
   reason: string;
   status: 'open' | 'reviewed' | 'actioned';
+  createdAt: string;
+}
+
+export interface PlayerBlock {
+  blockerId: string;
+  blockedId: string;
+  createdAt: string;
+}
+
+export type NotificationKind =
+  | 'rival_finished'
+  | 'rival_beat_you'
+  | 'rivalry_accepted'
+  | 'crew_joined';
+
+export interface Notification {
+  id: string;
+  playerId: string;
+  kind: NotificationKind;
+  body: string;
+  href: string | null;
+  readAt: string | null;
   createdAt: string;
 }
 
@@ -220,6 +246,7 @@ export interface DataStore {
 
   /* crews */
   createCrew(crew: Crew): Promise<Crew>;
+  updateCrew(id: string, patch: Partial<Crew>): Promise<Crew>;
   getCrewBySlug(slug: string): Promise<Crew | null>;
   getCrewByInviteCode(code: string): Promise<Crew | null>;
   getCrew(id: string): Promise<Crew | null>;
@@ -237,4 +264,17 @@ export interface DataStore {
   /* moderation */
   createReport(report: ModerationReport): Promise<ModerationReport>;
   listReports(status?: ModerationReport['status']): Promise<ModerationReport[]>;
+  updateReport(id: string, patch: Partial<ModerationReport>): Promise<ModerationReport>;
+
+  /* blocks */
+  blockPlayer(blockerId: string, blockedId: string): Promise<PlayerBlock>;
+  unblockPlayer(blockerId: string, blockedId: string): Promise<void>;
+  listBlockedIds(playerId: string): Promise<string[]>;
+  isEitherBlocked(a: string, b: string): Promise<boolean>;
+
+  /* notifications */
+  createNotification(notification: Notification): Promise<Notification>;
+  listNotifications(playerId: string, limit?: number): Promise<Notification[]>;
+  markNotificationsRead(playerId: string): Promise<void>;
+  listLinkedPlayers(): Promise<Player[]>;
 }

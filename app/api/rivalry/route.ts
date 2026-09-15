@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { getStore } from '@/lib/db';
 import { handler } from '@/lib/api';
 import type { Rivalry } from '@/lib/db/types';
+import { notifyPlayer } from '@/lib/notify/deliver';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,9 @@ export const POST = handler(
         { status: 400 },
       );
     }
+    if (await store.isEitherBlocked(player.id, target.id)) {
+      return NextResponse.json({ error: 'That player is blocked.', code: 'BLOCKED' }, { status: 403 });
+    }
 
     const [a, b] = pairKey(player.id, target.id);
     const existing = await store.getRivalry(a, b);
@@ -71,9 +75,16 @@ export const POST = handler(
           { status: 400 },
         );
       }
-      return NextResponse.json({
-        rivalry: await store.saveRivalry({ ...existing, status: 'active' }),
-      });
+      const rivalry = await store.saveRivalry({ ...existing, status: 'active' });
+      const requester = await store.getPlayer(existing.requestedBy);
+      if (requester) {
+        await notifyPlayer(requester, {
+          kind: 'rivalry_accepted',
+          body: `${player.displayName} accepted your rivalry.`,
+          href: `/rivalry/${rivalry.id}`,
+        });
+      }
+      return NextResponse.json({ rivalry });
     }
 
     const nemesisFor = new Set(existing.nemesisFor);

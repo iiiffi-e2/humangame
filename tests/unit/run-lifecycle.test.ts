@@ -157,4 +157,20 @@ describe('official run lifecycle', () => {
     const tally = await createStore().getCrowdTally(manifest.id, crowdEvent!.index);
     expect(tally.total).toBe(1);
   });
+
+  it('rejects a stolen run token from another session', async () => {
+    const { token, manifest } = await startOfficialRun(PLAYER, currentDateKey());
+    await seedPlayer(OTHER);
+    const first = manifest.events[0];
+    await expect(
+      submitEvent({
+        token,
+        playerId: OTHER,
+        index: 0,
+        result: goodAnswer(first!),
+        durationMs: 8000,
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_TOKEN' });
+    await expect(finishRun(token, OTHER)).rejects.toMatchObject({ code: 'BAD_TOKEN' });
+  });
 });

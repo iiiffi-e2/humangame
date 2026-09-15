@@ -1,3 +1,4 @@
+import { BlockForm } from '@/features/profile/BlockForm';
 import { ReportForm } from '@/features/profile/ReportForm';
 import { BackLink } from '@/components/ui';
 import { requirePlayer } from '@/lib/auth/session';
@@ -13,9 +14,10 @@ export const metadata = { title: 'Blocked and reports' };
  */
 export default async function ModerationPage() {
   const player = await requirePlayer();
-  const reports = (await getStore().listReports()).filter(
-    (report) => report.reporterId === player.id,
-  );
+  const store = getStore();
+  const reports = (await store.listReports()).filter((report) => report.reporterId === player.id);
+  const blockedIds = await store.listBlockedIds(player.id);
+  const blockedPlayers = await store.getPlayers(blockedIds);
 
   return (
     <main id="main" className="phone">
@@ -33,6 +35,14 @@ export default async function ModerationPage() {
           one of these.
         </p>
       </div>
+
+      <BlockForm
+        blocked={blockedPlayers.map((entry) => ({
+          id: entry.id,
+          displayName: entry.displayName,
+          username: entry.username,
+        }))}
+      />
 
       <ReportForm />
 

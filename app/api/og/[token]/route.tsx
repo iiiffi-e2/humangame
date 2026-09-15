@@ -1,7 +1,9 @@
 import { ImageResponse } from 'next/og';
+import { NextResponse } from 'next/server';
 import { topPercent } from '@/features/results/percentile';
 import { CARD_COLORS, CARD_SIZES } from '@/features/challenges/card';
 import { getStore } from '@/lib/db';
+import { allowOgRequest } from '@/lib/og-limit';
 import { pillarPercent } from '@/lib/scoring';
 
 export const runtime = 'nodejs';
@@ -13,9 +15,12 @@ export const runtime = 'nodejs';
  * configs, and it must read at thumbnail size, so the number is the picture.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ token: string }> },
 ) {
+  if (!(await allowOgRequest(request))) {
+    return new NextResponse('Too many requests.', { status: 429 });
+  }
   const { token } = await params;
   const store = getStore();
   const link = await store.getChallenge(token);
@@ -79,7 +84,7 @@ export async function GET(
           ))}
         </div>
 
-        <span style={{ fontSize: 30, fontWeight: 700 }}>Can you beat me? Five tests, 75 seconds.</span>
+        <span style={{ fontSize: 30, fontWeight: 700 }}>Can you beat me? Five events, 75 seconds.</span>
       </div>
     ),
     { width, height },

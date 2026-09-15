@@ -25,9 +25,10 @@ export const POST = handler(
     perPlayer: { name: 'run-event', limit: 200, windowSeconds: 3600 },
     perIp: { name: 'run-event', limit: 1000, windowSeconds: 3600 },
   },
-  async ({ body }) => {
+  async ({ body, player }) => {
     const outcome = await submitEvent({
       token: body.token,
+      playerId: player.id,
       index: body.index,
       result: body.result,
       durationMs: body.durationMs,

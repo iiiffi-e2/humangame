@@ -77,7 +77,11 @@ export function AdminBoard({
     <main id="main" style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 24px 64px' }}>
       <div className="statusbar" style={{ padding: 0 }}>
         <BackLink href="/" label="Today" />
-        <span className="mono">Admin</span>
+        <span className="mono">
+          Admin · <a href="/admin/reports" style={{ color: 'inherit' }}>Reports</a>
+          {' · '}
+          <a href="/admin/practice" style={{ color: 'inherit' }}>Practice</a>
+        </span>
       </div>
 
       <h1 className="disp" style={{ fontSize: 44, marginTop: 16 }}>

@@ -74,6 +74,7 @@ export async function playFullRun(playerId: string) {
   for (const event of manifest.events) {
     await submitEvent({
       token,
+      playerId,
       index: event.index,
       result: goodAnswer(event),
       durationMs: 8_000,
@@ -82,5 +83,5 @@ export async function playFullRun(playerId: string) {
   await createStore().updateRun(run.id, {
     startedAt: new Date(Date.now() - 90_000).toISOString(),
   });
-  return { finished: await finishRun(token), token, manifest };
+  return { finished: await finishRun(token, playerId), token, manifest };
 }

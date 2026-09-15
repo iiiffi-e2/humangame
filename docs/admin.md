@@ -68,12 +68,14 @@ faster. See [`content-authoring.md`](content-authoring.md#setting-a-prior).
 ## Moderation
 
 Reports from `/profile/moderation` land in `moderation_reports` with status
-`open`. Nothing is auto-actioned, and a report never affects the reported
-player's score. Usernames are already constrained at creation — lowercase
-letters, digits and underscores, 3–16 characters, with a reserved list — and
-display names and crew names are stripped of control characters, zero-width
-characters and bidi overrides, so the common leaderboard-defacing tricks do
-not reach a row in the first place.
+`open`. Review them at `/admin/reports`. Dismiss leaves the score alone.
+Hide marks the player or crew `hidden_from_boards` so they leave named
+public boards — they can still play. Nothing is auto-actioned, and a report
+never changes the reported player's score. Usernames are already constrained
+at creation — lowercase letters, digits and underscores, 3–16 characters,
+with a reserved list — and display names and crew names are stripped of
+control characters, zero-width characters and bidi overrides, so the common
+leaderboard-defacing tricks do not reach a row in the first place.
 
 ## Trust flags
 

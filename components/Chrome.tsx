@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LegalLinks } from '@/components/LegalLinks';
 import { Avatar, Wordmark } from '@/components/ui';
 import { formatCountdown, formatStamp } from '@/lib/daily/reset';
 
@@ -62,6 +63,7 @@ export function DesktopNav({
         <span>
           #{dayNumber} &middot; {formatStamp(date)} &middot; resets {formatCountdown(resetInMs)}
         </span>
+        <LegalLinks style={{ marginTop: 0 }} />
         <Link href="/profile" aria-label="Profile and settings" className="tap">
           <Avatar name={displayName} size={32} />
         </Link>

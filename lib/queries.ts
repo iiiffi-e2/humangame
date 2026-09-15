@@ -10,6 +10,7 @@ import { ensureManifest } from '@/lib/daily/service';
 import { getStore } from '@/lib/db';
 import type { Crew, Player, PlayerStats, Run } from '@/lib/db/types';
 import { countsForPublicBoards } from '@/lib/anti-cheat';
+import { visibleOnNamedBoard, type NamedBoard } from '@/lib/privacy';
 
 /**
  * Read models for the screens.
@@ -85,18 +86,31 @@ export async function friendStatuses(
     ]),
   ].filter((id) => id !== viewer.id);
 
-  if (ids.length === 0) return [];
+  const blocked = new Set(await store.listBlockedIds(viewer.id));
+  const unblocked = ids.filter((id) => !blocked.has(id));
+  const visibleIds: string[] = [];
+  for (const id of unblocked) {
+    if (!(await store.isEitherBlocked(viewer.id, id))) visibleIds.push(id);
+  }
+
+  if (visibleIds.length === 0) return [];
 
   const [players, runs] = await Promise.all([
-    store.getPlayers(ids),
-    store.listRunsForPlayers(ids, manifestId),
+    store.getPlayers(visibleIds),
+    store.listRunsForPlayers(visibleIds, manifestId),
   ]);
+  const visiblePlayers = players.filter((player) =>
+    visibleOnNamedBoard(player.settings.privacy, 'friends', {
+      hiddenFromBoards: player.hiddenFromBoards,
+      isViewer: player.id === viewer.id,
+    }),
+  );
   const byPlayer = new Map(
     runs.filter((run) => run.status === 'finished').map((run) => [run.playerId, run]),
   );
 
   const statuses = await Promise.all(
-    players.map(async (player): Promise<FriendStatus> => {
+    visiblePlayers.map(async (player): Promise<FriendStatus> => {
       const run = byPlayer.get(player.id);
       const rivalry = rivalries.find(
         (entry) => entry.playerAId === player.id || entry.playerBId === player.id,
@@ -243,6 +257,23 @@ export interface LeaderboardData {
 /** Country boards only appear once there are enough players to be meaningful. */
 export const COUNTRY_MINIMUM = 25;
 
+async function filterNamedBoardRuns(
+  runs: Run[],
+  board: NamedBoard,
+  viewerId: string,
+): Promise<Run[]> {
+  const players = await getStore().getPlayers(runs.map((run) => run.playerId));
+  const byId = new Map(players.map((player) => [player.id, player]));
+  return runs.filter((run) => {
+    const player = byId.get(run.playerId);
+    if (!player) return false;
+    return visibleOnNamedBoard(player.settings.privacy, board, {
+      hiddenFromBoards: player.hiddenFromBoards,
+      isViewer: player.id === viewerId,
+    });
+  });
+}
+
 export async function getLeaderboard(
   viewer: Player,
   tab: LeaderboardTab,
@@ -303,8 +334,10 @@ export async function getLeaderboard(
   };
 
   if (tab === 'global') {
-    const runs = (await store.listFinishedRuns(manifest.id))
-      .filter((run) => countsForPublicBoards(run.trust))
+    const trusted = (await store.listFinishedRuns(manifest.id)).filter((run) =>
+      countsForPublicBoards(run.trust),
+    );
+    const runs = (await filterNamedBoardRuns(trusted, 'global', viewer.id))
       .sort((a, b) => b.totalScore - a.totalScore)
       .slice(0, 50);
     return {
@@ -319,9 +352,10 @@ export async function getLeaderboard(
   }
 
   if (tab === 'country') {
-    const all = (await store.listFinishedRuns(manifest.id)).filter((run) =>
+    const trusted = (await store.listFinishedRuns(manifest.id)).filter((run) =>
       countsForPublicBoards(run.trust),
     );
+    const all = await filterNamedBoardRuns(trusted, 'country', viewer.id);
     const players = await store.getPlayers(all.map((run) => run.playerId));
     const country = viewer.country;
     const sameCountry = players.filter((player) => player.country && player.country === country);
@@ -352,7 +386,9 @@ export async function getLeaderboard(
   }
 
   if (tab === 'crews') {
-    const crews = await store.listCrewsForPlayer(viewer.id);
+    const crews = (await store.listCrewsForPlayer(viewer.id)).filter(
+      (entry) => !entry.hiddenFromBoards,
+    );
     const crew = crews[0];
     if (!crew) {
       return {
@@ -367,9 +403,10 @@ export async function getLeaderboard(
     }
     const members = await store.listCrewMembers(crew.id);
     const ids = members.map((member) => member.playerId);
-    const runs = (await store.listRunsForPlayers(ids, manifest.id)).filter(
+    const finished = (await store.listRunsForPlayers(ids, manifest.id)).filter(
       (run) => run.status === 'finished',
     );
+    const runs = await filterNamedBoardRuns(finished, 'crews', viewer.id);
     return {
       tab,
       dayNumber: manifest.dayNumber,
@@ -385,7 +422,14 @@ export async function getLeaderboard(
     // Consistency, not peaks: the same placement points a crew month uses, so
     // a player who shows up every day out-ranks one big Tuesday.
     const social = await friendStatuses(viewer, manifest.id, viewerHasPlayed);
-    const ids = [...social.map((friend) => friend.playerId), viewer.id];
+    const socialPlayers = await store.getPlayers(social.map((friend) => friend.playerId));
+    const visibleSocial = socialPlayers.filter((player) =>
+      visibleOnNamedBoard(player.settings.privacy, 'month', {
+        hiddenFromBoards: player.hiddenFromBoards,
+        isViewer: player.id === viewer.id,
+      }),
+    );
+    const ids = [...visibleSocial.map((player) => player.id), viewer.id];
     const players = await store.getPlayers(ids);
     const runs = (await Promise.all(ids.map((id) => store.listRunsForPlayer(id, 60)))).flat();
     const nameOf = new Map(players.map((player) => [player.id, player.displayName]));

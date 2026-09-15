@@ -1,7 +1,7 @@
 {
   "name": "HUMAN",
   "short_name": "HUMAN",
-  "description": "Five tests. One official run. Everyone gets the same five.",
+  "description": "Five events. One official run. Everyone gets the same five.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

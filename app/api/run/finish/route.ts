@@ -22,7 +22,7 @@ export const POST = handler(
     perIp: { name: 'run-finish', limit: 200, windowSeconds: 3600 },
   },
   async ({ body, player }) => {
-    const outcome = await finishRun(body.token);
+    const outcome = await finishRun(body.token, player.id);
     const payload = await buildResultPayload(outcome.run, player);
     return NextResponse.json({
       ...payload,

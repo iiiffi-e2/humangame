@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     template: '%s · HUMAN',
   },
   description:
-    'Five tests. One official run. Everyone gets the same five. Seventy-five seconds, once a day.',
+    'Five events. One official run. Everyone gets the same five. Seventy-five seconds, once a day.',
   applicationName: 'HUMAN',
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'HUMAN' },
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'HUMAN',
     title: 'HOW HUMAN ARE YOU TODAY?',
-    description: 'Five tests. One official run. Everyone gets the same five.',
+    description: 'Five events. One official run. Everyone gets the same five.',
   },
   twitter: { card: 'summary_large_image' },
   robots: { index: true, follow: true },
@@ -57,7 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <a href="#main" className="sr-only">
           Skip to content
         </a>
-        <AppChrome>{children}</AppChrome>
+        <AppChrome playerId={player?.id ?? null}>{children}</AppChrome>
       </body>
     </html>
   );

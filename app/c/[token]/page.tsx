@@ -21,7 +21,7 @@ export async function generateMetadata({
     title: 'Beat this score',
     openGraph: {
       title: 'Can you beat me?',
-      description: 'Five tests. One official run. Everyone gets the same five.',
+      description: 'Five events. One official run. Everyone gets the same five.',
       images: [{ url: `/api/og/${token}`, width: 1200, height: 630 }],
     },
     twitter: { card: 'summary_large_image', images: [`${publicEnv.siteUrl}/api/og/${token}`] },
@@ -92,7 +92,7 @@ export default async function ChallengePage({ params }: { params: Promise<{ toke
           <p style={{ margin: '22px 0 0', fontSize: 17, lineHeight: 1.35, opacity: 0.85 }}>
             You get one official run.
             <br />
-            Same five tests. Answers stay sealed.
+            Same five events. Answers stay sealed.
           </p>
         ) : (
           <div

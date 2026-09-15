@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { LegalLinks } from '@/components/LegalLinks';
 import { BackLink } from '@/components/ui';
-import type { PlayerSettings } from '@/lib/db/types';
+import type { Notification, PlayerSettings } from '@/lib/db/types';
 import { checkUsername } from '@/lib/auth/username';
 import { track } from '@/lib/analytics';
 import { apiPost } from '@/lib/client/api';
@@ -28,10 +29,14 @@ export function ProfileSettings({
   player,
   runsPlayed,
   today,
+  isAdmin = false,
+  notifications = [],
 }: {
   player: ProfilePlayer;
   runsPlayed: number;
   today: string;
+  isAdmin?: boolean;
+  notifications?: Notification[];
 }) {
   const [username, setUsername] = useState(player.username ?? '');
   const [displayName, setDisplayName] = useState(player.displayName);
@@ -207,10 +212,47 @@ export function ProfileSettings({
           onChange={(value) => save({ privacy: value as PlayerSettings['privacy'] })}
         />
         <Row label="Blocked & reports" value="Manage" href="/profile/moderation" />
+        {isAdmin ? <Row label="Admin console" value="Open" href="/admin" /> : null}
+        {notifications.length > 0 ? (
+          <section style={{ marginTop: 22 }}>
+            <h2 className="mono" style={{ opacity: 0.5, paddingBottom: 8, margin: 0, fontWeight: 500 }}>
+              Inbox
+            </h2>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+              {notifications.map((entry) => (
+                <li
+                  key={entry.id}
+                  style={{
+                    borderTop: '1px solid rgba(17,17,17,.2)',
+                    padding: '12px 0',
+                    opacity: entry.readAt ? 0.55 : 1,
+                  }}
+                >
+                  {entry.href ? (
+                    <a href={entry.href} style={{ color: 'inherit', textDecoration: 'none' }}>
+                      {entry.body}
+                    </a>
+                  ) : (
+                    entry.body
+                  )}
+                </li>
+              ))}
+            </ul>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ marginTop: 8 }}
+              onClick={() => void apiPost('/api/player/notifications', { action: 'read' })}
+            >
+              <span>Mark read</span>
+            </button>
+          </section>
+        ) : null}
         <p className="mono" style={{ opacity: 0.45, marginTop: 24, textTransform: 'none', lineHeight: 1.6 }}>
           HUMAN is a game. Your score is not an IQ, a diagnosis, or a measure of anything about your
           health. Day {today}.
         </p>
+        <LegalLinks style={{ marginTop: 12 }} />
       </section>
     </main>
   );

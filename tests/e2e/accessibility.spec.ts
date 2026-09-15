@@ -46,7 +46,7 @@ test.describe('accessibility and viewports', () => {
 
   test('every screen has one main landmark and a skip link', async ({ page }) => {
     await asNewGuest(page);
-    for (const path of ['/', '/leaderboards', '/history', '/crews', '/profile']) {
+    for (const path of ['/', '/leaderboards', '/history', '/crews', '/profile', '/privacy', '/terms']) {
       await page.goto(path);
       await expect(page.locator('main#main')).toHaveCount(1);
       await expect(page.getByRole('link', { name: 'Skip to content' })).toHaveCount(1);

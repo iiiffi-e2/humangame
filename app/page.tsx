@@ -61,7 +61,7 @@ export default async function HomePage() {
             className="mono"
             style={{ opacity: 0.5, fontSize: 9, textTransform: 'none', letterSpacing: '0.02em', lineHeight: 1.5 }}
           >
-            Same five tests for everyone. Scores are deterministic; percentile settles as the day
+            Same five events for everyone. Scores are deterministic; percentile settles as the day
             fills in.
           </p>
         </aside>
@@ -89,7 +89,7 @@ export default async function HomePage() {
               How human are you today?
             </h1>
             <p style={{ margin: '18px 0 0', fontSize: 16, lineHeight: 1.35, maxWidth: 300, textWrap: 'pretty' }}>
-              Five tests. One official run. Everyone gets the same five.
+              Five events. One official run. Everyone gets the same five.
             </p>
           </div>
 

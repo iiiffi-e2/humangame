@@ -16,6 +16,7 @@ import { ensureManifest } from '@/lib/daily/service';
 import { getStore } from '@/lib/db';
 import type { CrowdTallyRow, Run, RunEventRecord } from '@/lib/db/types';
 import { serverEnv } from '@/lib/env';
+import { notifyPlayer } from '@/lib/notify/deliver';
 import { EVENTS_PER_RUN, totalScore, type ScoreResult } from '@/lib/scoring';
 
 /**
@@ -113,9 +114,15 @@ export async function startOfficialRun(
   return { run: created, token, manifest, resumed: false };
 }
 
-async function loadRunForToken(token: string): Promise<{ run: Run; manifest: DailyManifest }> {
+async function loadRunForToken(
+  token: string,
+  sessionPlayerId?: string,
+): Promise<{ run: Run; manifest: DailyManifest }> {
   const payload = readRunToken(token, serverEnv().runSecret);
   if (!payload) throw new RunError('Run token is missing or expired.', 'BAD_TOKEN', 401);
+  if (sessionPlayerId && payload.playerId !== sessionPlayerId) {
+    throw new RunError('Run token does not match this player.', 'BAD_TOKEN', 403);
+  }
 
   const store = getStore();
   const run = await store.getRun(payload.runId);
@@ -150,6 +157,8 @@ function crowdResponseFrom(event: DailyEvent, result: unknown): { optionId: stri
 
 export interface SubmitEventInput {
   token: string;
+  /** Session player. A stolen token from another guest is rejected. */
+  playerId?: string;
   index: number;
   result: unknown;
   durationMs: number;
@@ -165,7 +174,7 @@ export interface SubmitEventOutput {
 }
 
 export async function submitEvent(input: SubmitEventInput): Promise<SubmitEventOutput> {
-  const { run, manifest } = await loadRunForToken(input.token);
+  const { run, manifest } = await loadRunForToken(input.token, input.playerId);
   if (run.status !== 'active') {
     throw new RunError('This run is already finished.', 'ALREADY_PLAYED', 409);
   }
@@ -253,8 +262,8 @@ export interface FinishRunOutput {
   trustReasons: string[];
 }
 
-export async function finishRun(token: string): Promise<FinishRunOutput> {
-  const { run, manifest } = await loadRunForToken(token);
+export async function finishRun(token: string, playerId?: string): Promise<FinishRunOutput> {
+  const { run, manifest } = await loadRunForToken(token, playerId);
   const store = getStore();
 
   if (run.status === 'finished') {
@@ -346,6 +355,34 @@ export async function finishRun(token: string): Promise<FinishRunOutput> {
       },
     }),
   );
+
+  const finisher = await store.getPlayer(finished.playerId);
+  if (finisher && countsForPublicBoards(trust)) {
+    const rivalries = (await store.listRivalries(finished.playerId)).filter(
+      (rivalry) => rivalry.status === 'active',
+    );
+    for (const rivalry of rivalries) {
+      const otherId =
+        rivalry.playerAId === finished.playerId ? rivalry.playerBId : rivalry.playerAId;
+      if (await store.isEitherBlocked(finished.playerId, otherId)) continue;
+      const other = await store.getPlayer(otherId);
+      if (!other) continue;
+      const theirRun = await store.getOfficialRun(otherId, finished.manifestId);
+      if (theirRun?.status === 'finished' && finalScore > theirRun.totalScore) {
+        await notifyPlayer(other, {
+          kind: 'rival_beat_you',
+          body: `${finisher.displayName} beat your score today.`,
+          href: `/rivalry/${rivalry.id}`,
+        });
+      } else {
+        await notifyPlayer(other, {
+          kind: 'rival_finished',
+          body: `${finisher.displayName} finished today's five.`,
+          href: `/rivalry/${rivalry.id}`,
+        });
+      }
+    }
+  }
 
   return {
     run: finished,

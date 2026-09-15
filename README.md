@@ -84,6 +84,8 @@ Further reading:
   questions and ORDER sets, and setting priors.
 - [`docs/deployment.md`](docs/deployment.md) — Supabase, secrets, scheduled
   manifest generation.
+- [`docs/go-live.md`](docs/go-live.md) — step-by-step production setup:
+  accounts, API keys, database, Vercel, first deploy.
 - [`docs/admin.md`](docs/admin.md) — the daily console, and what to do when an
   event is broken.
 
